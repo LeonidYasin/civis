@@ -161,13 +161,91 @@ async def create_bot_with_proxy():
     else:
         return Bot(token=TOKEN)
 
+# --- HANDLERS ---
+async def start(message: types.Message, state: FSMContext):
+    """Handler for /start command"""
+    logger.info(f"/start from {message.from_user.id}")
+    await state.set_state(Form.text)
+    await message.answer(
+        "Hello! You are joining Civis - the republic of professionals.\n\n"
+        "Tell about yourself and your professional goals.\n"
+        "Minimum 300 characters. This will help us understand your profile.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+async def process_text(message: types.Message, state: FSMContext):
+    """Process text from form"""
+    logger.info(f"Text received from {message.from_user.id}, length: {len(message.text)}")
+    if len(message.text) < 300:
+        await message.answer("Please write at least 300 characters. This is important for analysis.")
+        return
+    await state.update_data(text=message.text)
+    await state.set_state(Form.values)
+    await message.answer(
+        "Select 3 key values that you share in your work:",
+        reply_markup=values_keyboard
+    )
+
+async def process_values(message: types.Message, state: FSMContext):
+    """Process values selection"""
+    logger.info(f"Values from {message.from_user.id}: {message.text}")
+    await state.update_data(values=message.text)
+    await state.set_state(Form.role)
+    await message.answer(
+        "What is your main role?",
+        reply_markup=role_keyboard
+    )
+
+async def process_role(message: types.Message, state: FSMContext):
+    """Process role selection"""
+    logger.info(f"Role from {message.from_user.id}: {message.text}")
+    await state.update_data(role=message.text)
+    await state.set_state(Form.format)
+    await message.answer(
+        "Which communication format is convenient for you?",
+        reply_markup=format_keyboard
+    )
+
+async def process_format(message: types.Message, state: FSMContext):
+    """Process format selection"""
+    logger.info(f"Format from {message.from_user.id}: {message.text}")
+    await state.update_data(format=message.text)
+    data = await state.get_data()
+
+    # Save to database
+    success = save_profile(
+        tg_user_id=str(message.from_user.id),
+        tg_username=message.from_user.username or "unknown",
+        text=data.get('text', ''),
+        values=data.get('values', ''),
+        role=data.get('role', ''),
+        format=data.get('format', '')
+    )
+
+    if success:
+        await message.answer(
+            "You are in Civis!\n\n"
+            "Your profile is saved. Soon we will start matching you with projects and teams.\n"
+            "Stay tuned.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        logger.info(f"Profile saved for {message.from_user.id}")
+    else:
+        await message.answer(
+            "Profile save error. Try again later or use /start.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        logger.error(f"Profile save failed for {message.from_user.id}")
+
+    await state.clear()
+
 # --- MAIN ---
 async def main():
     """Main function"""
     logger.info("Starting Civis main bot...")
     logger.info(f"Token: {TOKEN[:10]}...{TOKEN[-5:]}")
     
-    # Create bot inside event loop
+    # Create bot and dispatcher inside event loop
     bot = await create_bot_with_proxy()
     dp = Dispatcher()
     
@@ -212,89 +290,6 @@ async def main():
             logger.error("  Proxy not configured")
         
         sys.exit(1)
-
-# --- HANDLERS ---
-@dp.message(Command("start"))
-async def start(message: types.Message, state: FSMContext):
-    """Handler for /start command"""
-    logger.info(f"/start from {message.from_user.id}")
-    await state.set_state(Form.text)
-    await message.answer(
-        "Hello! You are joining Civis - the republic of professionals.\n\n"
-        "Tell about yourself and your professional goals.\n"
-        "Minimum 300 characters. This will help us understand your profile.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-
-@dp.message(Form.text)
-async def process_text(message: types.Message, state: FSMContext):
-    """Process text from form"""
-    logger.info(f"Text received from {message.from_user.id}, length: {len(message.text)}")
-    if len(message.text) < 300:
-        await message.answer("Please write at least 300 characters. This is important for analysis.")
-        return
-    await state.update_data(text=message.text)
-    await state.set_state(Form.values)
-    await message.answer(
-        "Select 3 key values that you share in your work:",
-        reply_markup=values_keyboard
-    )
-
-@dp.message(Form.values)
-async def process_values(message: types.Message, state: FSMContext):
-    """Process values selection"""
-    logger.info(f"Values from {message.from_user.id}: {message.text}")
-    await state.update_data(values=message.text)
-    await state.set_state(Form.role)
-    await message.answer(
-        "What is your main role?",
-        reply_markup=role_keyboard
-    )
-
-@dp.message(Form.role)
-async def process_role(message: types.Message, state: FSMContext):
-    """Process role selection"""
-    logger.info(f"Role from {message.from_user.id}: {message.text}")
-    await state.update_data(role=message.text)
-    await state.set_state(Form.format)
-    await message.answer(
-        "Which communication format is convenient for you?",
-        reply_markup=format_keyboard
-    )
-
-@dp.message(Form.format)
-async def process_format(message: types.Message, state: FSMContext):
-    """Process format selection"""
-    logger.info(f"Format from {message.from_user.id}: {message.text}")
-    await state.update_data(format=message.text)
-    data = await state.get_data()
-
-    # Save to database
-    success = save_profile(
-        tg_user_id=str(message.from_user.id),
-        tg_username=message.from_user.username or "unknown",
-        text=data.get('text', ''),
-        values=data.get('values', ''),
-        role=data.get('role', ''),
-        format=data.get('format', '')
-    )
-
-    if success:
-        await message.answer(
-            "You are in Civis!\n\n"
-            "Your profile is saved. Soon we will start matching you with projects and teams.\n"
-            "Stay tuned.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        logger.info(f"Profile saved for {message.from_user.id}")
-    else:
-        await message.answer(
-            "Profile save error. Try again later or use /start.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        logger.error(f"Profile save failed for {message.from_user.id}")
-
-    await state.clear()
 
 if __name__ == "__main__":
     try:
