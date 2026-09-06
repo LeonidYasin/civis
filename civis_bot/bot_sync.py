@@ -40,6 +40,12 @@ def get_proxy_url():
     """Get proxy URL from .env or environment"""
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
+        # Проверяем протокол и порт
+        if 'socks5://' in proxy_url and '10809' in proxy_url:
+            # Исправляем SOCKS5 на HTTP для requests
+            fixed = proxy_url.replace('socks5://', 'http://')
+            logger.info(f"Fixed proxy: {proxy_url} -> {fixed}")
+            return fixed
         logger.info(f"Using proxy: {proxy_url}")
         return proxy_url
     
@@ -175,6 +181,7 @@ def clear_session(tg_id):
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
 if proxy_url:
+    # Для requests используем HTTP-прокси
     session = requests.Session()
     session.proxies = {'http': proxy_url, 'https': proxy_url}
     bot = TeleBot(token=TOKEN, threaded=False)
