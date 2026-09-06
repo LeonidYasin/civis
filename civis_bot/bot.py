@@ -21,7 +21,6 @@ from dotenv import load_dotenv
 # Proxy support
 import aiohttp
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiohttp_socks import ProxyConnector
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -42,38 +41,25 @@ if not TOKEN:
     sys.exit(1)
 
 # --- PROXY SETUP ---
-def get_proxy_connector():
-    """Create proxy connector from .env or environment variables"""
-    # First check .env
+def get_proxy_url():
+    """Get proxy URL from .env or environment"""
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
         logger.info(f"Proxy from .env: {proxy_url}")
-        return ProxyConnector.from_url(proxy_url)
+        return proxy_url
     
-    # Then check system env
     http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
     https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
     
     if https_proxy:
         logger.info(f"Proxy from HTTPS_PROXY: {https_proxy}")
-        return ProxyConnector.from_url(https_proxy)
+        return https_proxy
     elif http_proxy:
         logger.info(f"Proxy from HTTP_PROXY: {http_proxy}")
-        return ProxyConnector.from_url(http_proxy)
+        return http_proxy
     
     logger.info("No proxy configured, using direct connection")
     return None
-
-# --- CREATE BOT SESSION ---
-def create_bot_session():
-    """Create bot with proxy support if configured"""
-    connector = get_proxy_connector()
-    if connector:
-        aiohttp_session = aiohttp.ClientSession(connector=connector)
-        aiogram_session = AiohttpSession(session=aiohttp_session)
-        return aiogram_session
-    else:
-        return None
 
 # --- DATABASE ---
 DB_PATH = Path(__file__).parent / "civis_data.db"
@@ -161,13 +147,71 @@ format_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- BOT INIT ---
-session = create_bot_session()
-if session:
-    bot = Bot(token=TOKEN, session=session)
-else:
-    bot = Bot(token=TOKEN)
-dp = Dispatcher()
+# --- CREATE BOT INSIDE MAIN ---
+async def create_bot_with_proxy():
+    """Create bot with proxy if configured"""
+    proxy_url = get_proxy_url()
+    
+    if proxy_url:
+        from aiohttp_socks import ProxyConnector
+        connector = ProxyConnector.from_url(proxy_url)
+        aiohttp_session = aiohttp.ClientSession(connector=connector)
+        aiogram_session = AiohttpSession(session=aiohttp_session)
+        return Bot(token=TOKEN, session=aiogram_session)
+    else:
+        return Bot(token=TOKEN)
+
+# --- MAIN ---
+async def main():
+    """Main function"""
+    logger.info("Starting Civis main bot...")
+    logger.info(f"Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+    
+    # Create bot inside event loop
+    bot = await create_bot_with_proxy()
+    dp = Dispatcher()
+    
+    # Register handlers
+    dp.message.register(start, Command("start"))
+    dp.message.register(process_text, Form.text)
+    dp.message.register(process_values, Form.values)
+    dp.message.register(process_role, Form.role)
+    dp.message.register(process_format, Form.format)
+    
+    try:
+        # Check connection
+        logger.info("Checking connection to Telegram API...")
+        me = await bot.me()
+        logger.info(f"Connected: @{me.username} ({me.full_name})")
+        
+        # Start polling
+        logger.info("Starting polling...")
+        await dp.start_polling(bot)
+        
+    except Exception as e:
+        logger.error(f"Critical error: {e}")
+        
+        # Diagnostics
+        logger.error("Diagnostics:")
+        logger.error(f"  - Python: {sys.version}")
+        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+        
+        # DNS check
+        try:
+            import socket
+            socket.gethostbyname("api.telegram.org")
+            logger.error("  DNS: api.telegram.org resolves")
+        except Exception as dns_err:
+            logger.error(f"  DNS error: {dns_err}")
+        
+        # Proxy check
+        proxy_url = get_proxy_url()
+        if proxy_url:
+            logger.error(f"  Proxy configured: {proxy_url}")
+        else:
+            logger.error("  Proxy not configured")
+        
+        sys.exit(1)
 
 # --- HANDLERS ---
 @dp.message(Command("start"))
@@ -251,47 +295,6 @@ async def process_format(message: types.Message, state: FSMContext):
         logger.error(f"Profile save failed for {message.from_user.id}")
 
     await state.clear()
-
-# --- MAIN ---
-async def main():
-    """Main function"""
-    logger.info("Starting Civis main bot...")
-    logger.info(f"Token: {TOKEN[:10]}...{TOKEN[-5:]}")
-    
-    try:
-        # Check connection
-        logger.info("Checking connection to Telegram API...")
-        me = await bot.me()
-        logger.info(f"Connected: @{me.username} ({me.full_name})")
-        
-        # Start polling
-        logger.info("Starting polling...")
-        await dp.start_polling(bot)
-        
-    except Exception as e:
-        logger.error(f"Critical error: {e}")
-        
-        # Diagnostics
-        logger.error("Diagnostics:")
-        logger.error(f"  - Python: {sys.version}")
-        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
-        
-        # DNS check
-        try:
-            import socket
-            socket.gethostbyname("api.telegram.org")
-            logger.error("  DNS: api.telegram.org resolves")
-        except Exception as dns_err:
-            logger.error(f"  DNS error: {dns_err}")
-        
-        # Proxy check
-        proxy_url = os.getenv("PROXY_URL")
-        if proxy_url:
-            logger.error(f"  Proxy configured in .env: {proxy_url}")
-        else:
-            logger.error("  Proxy not configured in .env")
-        
-        sys.exit(1)
 
 if __name__ == "__main__":
     try:
