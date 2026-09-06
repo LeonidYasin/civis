@@ -12,7 +12,7 @@ from telebot import TeleBot
 
 from config import TOKEN, get_proxy_url
 from database import init_db
-from handlers import register_handlers
+from handlers import register_handlers, set_bot
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -45,7 +45,6 @@ else:
     logger.info("Bot created without proxy")
 
 # --- SET BOT FOR HANDLERS ---
-from handlers import set_bot
 set_bot(bot)
 
 # --- REGISTER HANDLERS ---
