@@ -356,7 +356,6 @@ def cmd_setkey(message: Message):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    # Check if key is provided
     parts = message.text.split()
     if len(parts) < 2:
         bot.reply_to(
@@ -383,7 +382,6 @@ def cmd_match(message: Message):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    # Check if user has OpenAI key
     openai_key = get_openai_key(tg_id)
     if not openai_key:
         bot.reply_to(
@@ -393,7 +391,6 @@ def cmd_match(message: Message):
         )
         return
     
-    # Check subscription
     if not can_use_match(tg_id):
         remaining = get_matches_remaining(tg_id)
         bot.reply_to(
@@ -404,16 +401,13 @@ def cmd_match(message: Message):
         )
         return
     
-    # Increment match count
     increment_matches_used(tg_id)
     
-    # Get all citizens
     citizens = get_all_citizens()
     if not citizens:
         bot.reply_to(message, "No citizens to match with yet. Come back later!")
         return
     
-    # Build prompt for OpenAI
     user_profile = f"""Name: {user.get('name', 'Unknown')}
 Role: {user.get('role', 'N/A')}
 Values: {user.get('user_values', 'N/A')}
@@ -421,14 +415,13 @@ About: {user.get('about_text', 'N/A')}"""
     
     citizens_list = []
     for username, name, role, values in citizens:
-        if tg_id != get_user_by_username(username):  # Skip self
+        if tg_id != get_user_by_username(username):
             citizens_list.append(f"@{username} - {name} ({role})")
     
     if not citizens_list:
         bot.reply_to(message, "No other citizens to match with yet. Share the bot with friends!")
         return
     
-    # This is a placeholder — we'll implement OpenAI call in the next step
     bot.reply_to(
         message,
         f"🔍 AI Matching in progress...\n\n"
@@ -555,13 +548,9 @@ def handle_survey(message: Message):
             bot.reply_to(message, f"Please choose a value from the buttons.\n\nCurrent selection: {len(selected)}/3")
     
     elif state == 'survey_role':
-        roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
-        # Check if text is in the list (with language support)
-        valid_roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
         if lang == 'ru':
             ru_roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
             if text in ru_roles:
-                # Map to English for storage
                 role_map = {
                     "Исполнитель": "Executor",
                     "Заказчик": "Customer",
@@ -578,6 +567,7 @@ def handle_survey(message: Message):
                 )
                 return
         else:
+            valid_roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
             if text not in valid_roles:
                 bot.reply_to(
                     message,
@@ -590,12 +580,32 @@ def handle_survey(message: Message):
         bot.reply_to(message, TEXTS[lang]['format_ask'], reply_markup=get_formats_keyboard(lang))
     
     elif state == 'survey_format':
-        formats = get_formats(lang)
-        if text not in formats:
-            bot.reply_to(message, f"Please select a format from the buttons: {', '.join(formats)}")
-            return
-        
-        data['format'] = text
+        if lang == 'ru':
+            ru_formats = ["Текст", "Голос", "Видео", "Любой"]
+            if text in ru_formats:
+                # Store English value
+                format_map = {
+                    "Текст": "Text",
+                    "Голос": "Voice",
+                    "Видео": "Video",
+                    "Любой": "Any"
+                }
+                data['format'] = format_map[text]
+            else:
+                bot.reply_to(
+                    message,
+                    f"Пожалуйста, выберите формат из кнопок: {', '.join(ru_formats)}"
+                )
+                return
+        else:
+            valid_formats = ["Text", "Voice", "Video", "Any"]
+            if text not in valid_formats:
+                bot.reply_to(
+                    message,
+                    f"Please select a format from the buttons: {', '.join(valid_formats)}"
+                )
+                return
+            data['format'] = text
         
         username = message.from_user.username or "unknown"
         
@@ -615,7 +625,6 @@ def handle_survey(message: Message):
             
             clear_session(tg_id)
             
-            # Create subscription for user
             create_subscription(tg_id)
             
             bot.reply_to(
