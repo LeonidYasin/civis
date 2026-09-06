@@ -61,6 +61,45 @@ def get_main_keyboard(lang='en'):
     
     return keyboard
 
+def get_category_keyboard(lang='en'):
+    """Category selection for offers/requests - 2 columns"""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    
+    if lang == 'ru':
+        keyboard.row(
+            KeyboardButton("Общее"),
+            KeyboardButton("Такси")
+        )
+        keyboard.row(
+            KeyboardButton("Доставка"),
+            KeyboardButton("Услуги")
+        )
+        keyboard.row(
+            KeyboardButton("Товары"),
+            KeyboardButton("Другое")
+        )
+        keyboard.row(
+            KeyboardButton("/cancel")
+        )
+    else:
+        keyboard.row(
+            KeyboardButton("General"),
+            KeyboardButton("Taxi")
+        )
+        keyboard.row(
+            KeyboardButton("Delivery"),
+            KeyboardButton("Services")
+        )
+        keyboard.row(
+            KeyboardButton("Goods"),
+            KeyboardButton("Other")
+        )
+        keyboard.row(
+            KeyboardButton("/cancel")
+        )
+    
+    return keyboard
+
 def get_values_keyboard(lang='en'):
     """Values selection - 3 columns"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
