@@ -36,7 +36,6 @@ bot = None
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
-    # Also set bot in survey and language modules
     set_survey_bot(bot_instance)
     set_language_bot(bot_instance)
 
@@ -47,7 +46,6 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
-    # Command handlers
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
@@ -72,10 +70,7 @@ def register_handlers():
     bot.message_handler(commands=['delete_offer'])(cmd_delete_offer)
     bot.message_handler(commands=['delete_request'])(cmd_delete_request)
     
-    # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
-    
-    # Survey state handler
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
@@ -212,7 +207,6 @@ def cmd_my_requests(message: Message):
     bot.reply_to(message, text)
 
 def cmd_delete_offer(message: Message):
-    """Delete an offer by ID"""
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -236,7 +230,6 @@ def cmd_delete_offer(message: Message):
         bot.reply_to(message, f"❌ Offer #{offer_id} not found or you don't have permission to delete it.")
 
 def cmd_delete_request(message: Message):
-    """Delete a request by ID"""
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -392,7 +385,7 @@ def cmd_subscribe(message: Message):
     
     user = get_user(tg_id)
     if not user:
-        bot.reply_to(message, "You don't have a profile yet. Use /start to create one!")
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
     if user.get('status') != 'completed':
@@ -408,32 +401,22 @@ def cmd_subscribe(message: Message):
     remaining = get_matches_remaining(tg_id)
     remaining_text = str(remaining) if remaining != float('inf') else '∞'
     
-    text = f"""Subscription Plans
+    # Use localized text
+    text = f"""{get_text(tg_id, 'subscribe_title')}
 
-Current plan: {sub['plan'].upper()}
-Matches remaining: {remaining_text}
+{get_text(tg_id, 'subscribe_current', plan=sub['plan'].upper())}
+{get_text(tg_id, 'subscribe_remaining', remaining=remaining_text)}
 
-Free — $0/month
-  • 3 matches/month
-  • Basic profile
-  • View citizens
+{get_text(tg_id, 'subscribe_free')}
 
-Premium — $9.99/month
-  • Unlimited matches
-  • Priority in search
-  • Export profile (JSON)
-  • Early access to new features
+{get_text(tg_id, 'subscribe_premium')}
 
-Lifetime — $99 one-time
-  • All Premium features
-  • MCP tools access
-  • Lifetime updates
+{get_text(tg_id, 'subscribe_lifetime')}
 
-To upgrade, send /setkey to use your own OpenAI key, or contact @civis_support for payment."""
+{get_text(tg_id, 'subscribe_upgrade')}"""
     bot.reply_to(message, text)
 
 def cmd_setkey(message: Message):
-    """Set OpenAI API key"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -442,21 +425,16 @@ def cmd_setkey(message: Message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.reply_to(
-            message,
-            "Please provide your OpenAI API key:\n"
-            "/setkey sk-...\n\n"
-            "You can get your key at: https://platform.openai.com/api-keys"
-        )
+        bot.reply_to(message, get_text(tg_id, 'setkey_prompt'))
         return
     
     key = parts[1]
     if not key.startswith('sk-') or len(key) < 20:
-        bot.reply_to(message, "Invalid OpenAI key format. It should start with 'sk-'. Please check and try again.")
+        bot.reply_to(message, get_text(tg_id, 'setkey_invalid'))
         return
     
     save_openai_key(tg_id, key)
-    bot.reply_to(message, "OpenAI key saved successfully! You can now use /match for AI-powered matching.")
+    bot.reply_to(message, get_text(tg_id, 'setkey_saved'))
 
 def cmd_match(message: Message):
     """AI-powered matching"""
@@ -468,20 +446,14 @@ def cmd_match(message: Message):
     
     openai_key = get_openai_key(tg_id)
     if not openai_key:
-        bot.reply_to(
-            message,
-            "You need to set your OpenAI API key first.\n"
-            "Use /setkey sk-... to set your key."
-        )
+        bot.reply_to(message, get_text(tg_id, 'setkey_required'))
         return
     
     if not can_use_match(tg_id):
         remaining = get_matches_remaining(tg_id)
         bot.reply_to(
             message,
-            f"You've used all your free matches.\n"
-            f"Remaining: {remaining}\n"
-            "Use /subscribe to upgrade to Premium."
+            get_text(tg_id, 'match_limit_exceeded', remaining=remaining)
         )
         return
     
@@ -489,7 +461,7 @@ def cmd_match(message: Message):
     
     citizens = get_all_citizens()
     if not citizens:
-        bot.reply_to(message, "No citizens to match with yet. Come back later!")
+        bot.reply_to(message, get_text(tg_id, 'match_no_citizens'))
         return
     
     user_profile = f"""Name: {user.get('name', 'Unknown')}
@@ -503,19 +475,15 @@ About: {user.get('about_text', 'N/A')}"""
             citizens_list.append(f"@{username} - {name} ({role})")
     
     if not citizens_list:
-        bot.reply_to(message, "No other citizens to match with yet. Share the bot with friends!")
+        bot.reply_to(message, get_text(tg_id, 'match_no_others'))
         return
     
     bot.reply_to(
         message,
-        f"AI Matching in progress...\n\n"
-        f"Your profile:\n{user_profile}\n\n"
-        f"We're analyzing {len(citizens_list)} other citizens.\n"
-        f"Full AI matching coming soon!"
+        get_text(tg_id, 'match_in_progress', profile=user_profile, count=len(citizens_list))
     )
 
 def cmd_search(message: Message):
-    """Search citizens by name, role, or values"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -548,7 +516,6 @@ def cmd_search(message: Message):
     bot.reply_to(message, text)
 
 def get_user_by_username(username):
-    """Helper to get user by username"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT tg_id FROM users WHERE username = ?", (username,))
