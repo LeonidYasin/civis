@@ -8,6 +8,7 @@ import os
 import sys
 import sqlite3
 import json
+import signal
 from datetime import datetime
 from pathlib import Path
 
@@ -25,6 +26,15 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# --- SIGNAL HANDLER FOR CLEAN EXIT ---
+def signal_handler(sig, frame):
+    """Handle Ctrl+C gracefully"""
+    logger.info("\n⏹️ Received interrupt signal. Stopping bot...")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 # --- LOAD ENV ---
 load_dotenv()
@@ -79,6 +89,13 @@ def init_db():
             updated_at TEXT
         )
     """)
+    
+    # Check if language column exists, if not add it
+    cur.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cur.fetchall()]
+    if 'language' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'en'")
+        logger.info("Added 'language' column to users table")
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -323,7 +340,6 @@ def cmd_start(message: Message):
         )
         return
     
-    # Show language selection
     set_session(tg_id, 'language_select', {})
     bot.reply_to(
         message,
@@ -578,11 +594,11 @@ if __name__ == "__main__":
         me = bot.get_me()
         logger.info(f"Connected: @{me.username} ({me.full_name})")
         
-        logger.info("Starting polling...")
+        logger.info("Starting polling... (Press Ctrl+C to stop)")
         bot.infinity_polling()
         
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        logger.info("⏹️ Bot stopped by user (Ctrl+C)")
     except Exception as e:
         logger.error(f"Critical error: {e}")
         sys.exit(1)
