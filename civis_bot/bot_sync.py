@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # --- SIGNAL HANDLER FOR CLEAN EXIT ---
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
-    logger.info("\n⏹️ Received interrupt signal. Stopping bot...")
+    logger.info("\nStopping bot...")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -90,7 +90,6 @@ def init_db():
         )
     """)
     
-    # Check if language column exists, if not add it
     cur.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in cur.fetchall()]
     if 'language' not in columns:
@@ -187,66 +186,74 @@ def clear_session(tg_id):
 # --- TRANSLATIONS ---
 TEXTS = {
     'en': {
-        'welcome': """🏛️ Welcome to Civis!
+        'welcome': """Welcome to Civis!
 
-Civis is a Republic of Professionals — a community where people connect based on trust, values, and shared goals.
+Civis is a Republic of Professionals - a community where people connect based on trust, values, and shared goals.
 
 We use AI to understand who you are and match you with the right people, projects, and opportunities.
 
 No resumes. No cold calls. Just real connections.
 
 Let's create your profile!""",
-        'language_set': "🌍 Language set to English.",
-        'choose_language': "🌍 Choose your language:",
+        'language_set': "Language set to English.",
+        'choose_language': "Choose your language:",
         'name_ask': "What is your name?",
         'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
         'about_short': "That's a bit short. Could you tell me a little more about yourself?",
-        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just type them separated by commas, or click the buttons one by one.)",
-        'values_ask': "List your 3 key values (e.g. Honesty, Expertise, Speed):",
-        'values_error': "Please select exactly 3 values. Write them separated by commas, or click the buttons one by one.",
+        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just click the buttons one by one. You'll see your selection below.)",
+        'values_ask': "Choose 3 values from the buttons below:",
+        'values_selected': "Selected values: {values}\n\nChoose {remaining} more or click /done when finished:",
+        'values_error': "Please select 3 values total. You have {count}. Choose {remaining} more.",
+        'values_complete': "Great! You've selected 3 values.",
+        'values_done': "You selected: {values}",
         'role_ask': "What is your main role?",
         'role_error': "Please select a role from the buttons.",
         'format_ask': "Which communication format is convenient for you?",
         'format_error': "Please select a format from the buttons.",
-        'profile_complete': "🎉 Congratulations! Your profile is complete.\nYou are now a citizen of Civis!",
-        'cancel': "✅ Cancelled.",
+        'profile_complete': "Congratulations! Your profile is complete.\nYou are now a citizen of Civis!",
+        'cancel': "Cancelled.",
         'unknown': "Use /start to create your profile or /help for commands.",
-        'profile': "👤 Profile:",
+        'profile': "Profile:",
         'no_profile': "You don't have a profile yet. Use /start to create one!",
-        'help': "📚 Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
-        'status': "🤖 Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
+        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
+        'status': "Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
         'values_list': "Honesty, Expertise, Initiative, Reliability, Speed, Empathy, Systematic, Creativity, Openness, Ambition",
+        'done_button': "/done",
     },
     'ru': {
-        'welcome': """🏛️ Добро пожаловать в Civis!
+        'welcome': """Welcome to Civis!
 
-Civis — это Республика Профессионалов — сообщество, где люди соединяются на основе доверия, ценностей и общих целей.
+Civis is a Republic of Professionals - a community where people connect based on trust, values, and shared goals.
 
-Мы используем ИИ, чтобы понять, кто вы, и подобрать вам подходящих людей, проекты и возможности.
+We use AI to understand who you are and match you with the right people, projects, and opportunities.
 
-Без резюме. Без холодных звонков. Только настоящие связи.
+No resumes. No cold calls. Just real connections.
 
-Давайте создадим ваш профиль!""",
-        'language_set': "🌍 Язык установлен: Русский.",
-        'choose_language': "🌍 Выберите язык:",
-        'name_ask': "Как вас зовут?",
-        'about_ask': "Расскажите немного о себе и своих профессиональных целях.\n(Достаточно пары предложений.)",
-        'about_short': "Это коротковато. Не могли бы вы рассказать о себе чуть больше?",
-        'values_intro': "Чтобы подобрать вам подходящих людей, нам нужно понять, что для вас важно в работе.\n\nВыберите 3 ключевые ценности из списка ниже.\n(Напишите их через запятую или нажимайте кнопки по одной.)",
-        'values_ask': "Перечислите ваши 3 ключевые ценности (например: Честность, Экспертиза, Скорость):",
-        'values_error': "Пожалуйста, выберите ровно 3 ценности. Напишите их через запятую или нажимайте кнопки по одной.",
-        'role_ask': "Какова ваша основная роль?",
-        'role_error': "Пожалуйста, выберите роль из кнопок.",
-        'format_ask': "Какой формат общения вам удобен?",
-        'format_error': "Пожалуйста, выберите формат из кнопок.",
-        'profile_complete': "🎉 Поздравляем! Ваш профиль заполнен.\nТеперь вы гражданин Civis!",
-        'cancel': "✅ Отменено.",
-        'unknown': "Используйте /start для создания профиля или /help для помощи.",
-        'profile': "👤 Профиль:",
-        'no_profile': "У вас ещё нет профиля. Используйте /start, чтобы создать его!",
-        'help': "📚 Civis Бот\n\n/start - Создать профиль\n/profile - Мой профиль\n/survey - Обновить профиль\n/status - Статус бота\n/cancel - Отменить текущую операцию\n/help - Помощь",
-        'status': "🤖 Civis Бот\n\nПрофилей: {count}\nПрокси: {proxy}",
-        'values_list': "Честность, Экспертиза, Инициатива, Надёжность, Скорость, Эмпатия, Системность, Креативность, Открытость, Амбициозность",
+Let's create your profile!""",
+        'language_set': "Language set to Russian.",
+        'choose_language': "Choose your language:",
+        'name_ask': "What is your name?",
+        'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
+        'about_short': "That's a bit short. Could you tell me a little more about yourself?",
+        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just click the buttons one by one. You'll see your selection below.)",
+        'values_ask': "Choose 3 values from the buttons below:",
+        'values_selected': "Selected values: {values}\n\nChoose {remaining} more or click /done when finished:",
+        'values_error': "Please select 3 values total. You have {count}. Choose {remaining} more.",
+        'values_complete': "Great! You've selected 3 values.",
+        'values_done': "You selected: {values}",
+        'role_ask': "What is your main role?",
+        'role_error': "Please select a role from the buttons.",
+        'format_ask': "Which communication format is convenient for you?",
+        'format_error': "Please select a format from the buttons.",
+        'profile_complete': "Congratulations! Your profile is complete.\nYou are now a citizen of Civis!",
+        'cancel': "Cancelled.",
+        'unknown': "Use /start to create your profile or /help for commands.",
+        'profile': "Profile:",
+        'no_profile': "You don't have a profile yet. Use /start to create one!",
+        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
+        'status': "Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
+        'values_list': "Honesty, Expertise, Initiative, Reliability, Speed, Empathy, Systematic, Creativity, Openness, Ambition",
+        'done_button': "/done",
     }
 }
 
@@ -265,16 +272,16 @@ VALUE_MAP = {
         'Ambition': 'Ambition',
     },
     'ru': {
-        'Честность': 'Honesty',
-        'Экспертиза': 'Expertise',
-        'Инициатива': 'Initiative',
-        'Надёжность': 'Reliability',
-        'Скорость': 'Speed',
-        'Эмпатия': 'Empathy',
-        'Системность': 'Systematic',
-        'Креативность': 'Creativity',
-        'Открытость': 'Openness',
-        'Амбициозность': 'Ambition',
+        'Honesty': 'Honesty',
+        'Expertise': 'Expertise',
+        'Initiative': 'Initiative',
+        'Reliability': 'Reliability',
+        'Speed': 'Speed',
+        'Empathy': 'Empathy',
+        'Systematic': 'Systematic',
+        'Creativity': 'Creativity',
+        'Openness': 'Openness',
+        'Ambition': 'Ambition',
     }
 }
 
@@ -291,10 +298,7 @@ def get_value_list(lang):
 
 def get_value_buttons(lang):
     """Get value buttons for keyboard"""
-    if lang == 'ru':
-        return ["Честность", "Экспертиза", "Инициатива", "Надёжность", "Скорость", "Эмпатия", "Системность", "Креативность", "Открытость", "Амбициозность"]
-    else:
-        return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
+    return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
 
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
@@ -318,6 +322,7 @@ def set_commands():
         BotCommand("status", "Bot status"),
         BotCommand("help", "Help"),
         BotCommand("cancel", "Cancel current operation"),
+        BotCommand("done", "Finish value selection"),
     ]
     bot.set_my_commands(commands)
     logger.info("Commands menu set")
@@ -326,8 +331,8 @@ def set_commands():
 def get_language_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     keyboard.add(
-        KeyboardButton("🇬🇧 English"),
-        KeyboardButton("🇷🇺 Русский")
+        KeyboardButton("English"),
+        KeyboardButton("Russian")
     )
     return keyboard
 
@@ -345,15 +350,13 @@ def get_values_keyboard(lang='en'):
     values = get_value_buttons(lang)
     buttons = [KeyboardButton(v) for v in values]
     keyboard.add(*buttons)
-    keyboard.add(KeyboardButton("/cancel"))
+    done_text = TEXTS[lang]['done_button']
+    keyboard.add(KeyboardButton(done_text))
     return keyboard
 
 def get_roles_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    if lang == 'ru':
-        roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор"]
-    else:
-        roles = ["Executor", "Customer", "Coordinator", "Investor"]
+    roles = ["Executor", "Customer", "Coordinator", "Investor"]
     buttons = [KeyboardButton(r) for r in roles]
     keyboard.add(*buttons)
     keyboard.add(KeyboardButton("/cancel"))
@@ -361,10 +364,7 @@ def get_roles_keyboard(lang='en'):
 
 def get_formats_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    if lang == 'ru':
-        formats = ["Текст", "Голос", "Видео", "Любой"]
-    else:
-        formats = ["Text", "Voice", "Video", "Any"]
+    formats = ["Text", "Voice", "Video", "Any"]
     buttons = [KeyboardButton(f) for f in formats]
     keyboard.add(*buttons)
     keyboard.add(KeyboardButton("/cancel"))
@@ -383,7 +383,7 @@ def cmd_start(message: Message):
         lang = user.get('language', 'en')
         bot.reply_to(
             message,
-            f"Welcome back, {user.get('name', 'friend')}! 🎉\n\n"
+            f"Welcome back, {user.get('name', 'friend')}!\n\n"
             "Your profile is complete.\n"
             "Use /profile to view or /survey to update."
         )
@@ -462,7 +462,7 @@ def cmd_status(message: Message):
         )
     except Exception as e:
         logger.error(f"Status error: {e}")
-        bot.reply_to(message, f"❌ Error: {e}")
+        bot.reply_to(message, f"Error: {e}")
 
 @bot.message_handler(commands=['cancel'])
 def cmd_cancel(message: Message):
@@ -477,8 +477,39 @@ def cmd_cancel(message: Message):
         reply_markup=get_main_keyboard()
     )
 
+@bot.message_handler(commands=['done'])
+def cmd_done(message: Message):
+    """Complete value selection"""
+    tg_id = message.from_user.id
+    state, data = get_session(tg_id)
+    
+    if state != 'survey_values':
+        bot.reply_to(message, "You're not in value selection mode.")
+        return
+    
+    selected = data.get('selected_values', [])
+    if len(selected) != 3:
+        lang = data.get('language', 'en')
+        remaining = 3 - len(selected)
+        bot.reply_to(
+            message,
+            TEXTS[lang]['values_error'].format(count=len(selected), remaining=remaining)
+        )
+        return
+    
+    # Process selected values
+    lang = data.get('language', 'en')
+    data['user_values'] = ', '.join(selected)
+    
+    set_session(tg_id, 'survey_role', data)
+    bot.reply_to(
+        message,
+        TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'],
+        reply_markup=get_roles_keyboard(lang)
+    )
+
 # --- LANGUAGE SELECTION ---
-@bot.message_handler(func=lambda message: message.text in ["🇬🇧 English", "🇷🇺 Русский"])
+@bot.message_handler(func=lambda message: message.text in ["English", "Russian"])
 def handle_language_selection(message: Message):
     """Handle language selection"""
     tg_id = message.from_user.id
@@ -544,7 +575,7 @@ def handle_survey(message: Message):
         set_session(tg_id, 'survey_about', data)
         bot.reply_to(
             message,
-            f"Nice to meet you, {text}! 👋\n\n" + TEXTS[lang]['about_ask']
+            f"Nice to meet you, {text}!\n\n" + TEXTS[lang]['about_ask']
         )
     
     elif state == 'survey_about':
@@ -552,9 +583,9 @@ def handle_survey(message: Message):
             bot.reply_to(message, TEXTS[lang]['about_short'])
             return
         data['about_text'] = text
+        data['selected_values'] = []
         set_session(tg_id, 'survey_values', data)
         
-        # Show values intro and keyboard
         bot.reply_to(
             message,
             TEXTS[lang]['values_intro'] + "\n\n" + TEXTS[lang]['values_ask'],
@@ -562,56 +593,57 @@ def handle_survey(message: Message):
         )
     
     elif state == 'survey_values':
-        # Parse values - support both languages
         value_map = VALUE_MAP.get(lang, VALUE_MAP['en'])
+        selected = data.get('selected_values', [])
         
-        # Split by comma or newline
-        selected = []
-        for part in text.split(','):
-            for v in part.strip().split('\n'):
-                v = v.strip()
-                if v:
-                    # Try to find in value map
-                    if v in value_map:
-                        selected.append(value_map[v])
-                    elif v in VALUE_MAP['en']:
-                        selected.append(v)
-                    elif v in VALUE_MAP['ru']:
-                        selected.append(VALUE_MAP['ru'][v])
+        valid_value = None
+        if text in value_map:
+            valid_value = value_map[text]
+        elif text in VALUE_MAP['en']:
+            valid_value = text
+        elif text in VALUE_MAP['ru']:
+            valid_value = VALUE_MAP['ru'][text]
         
-        # Remove duplicates
-        selected = list(dict.fromkeys(selected))
-        
-        if len(selected) != 3:
-            # Show error with current selection
-            current = ', '.join(selected) if selected else 'none'
+        if valid_value and valid_value not in selected:
+            selected.append(valid_value)
+            data['selected_values'] = selected
+            set_session(tg_id, 'survey_values', data)
+            
+            remaining = 3 - len(selected)
+            if remaining > 0:
+                bot.reply_to(
+                    message,
+                    TEXTS[lang]['values_selected'].format(
+                        values=', '.join(selected),
+                        remaining=remaining
+                    ),
+                    reply_markup=get_values_keyboard(lang)
+                )
+            else:
+                bot.reply_to(
+                    message,
+                    TEXTS[lang]['values_complete'],
+                    reply_markup=ReplyKeyboardRemove()
+                )
+                
+                data['user_values'] = ', '.join(selected)
+                set_session(tg_id, 'survey_role', data)
+                bot.reply_to(
+                    message,
+                    TEXTS[lang]['role_ask'],
+                    reply_markup=get_roles_keyboard(lang)
+                )
+                
+        elif text in ["/done", "✅ /done"]:
+            pass
+        else:
             bot.reply_to(
                 message,
-                TEXTS[lang]['values_error'] + f"\n\nYou selected: {current}\n\nAvailable: {get_value_list(lang)}"
+                f"Please choose a value from the buttons.\n\nCurrent selection: {len(selected)}/3"
             )
-            return
-        
-        # Store values in user's language
-        if lang == 'ru':
-            # Store Russian names
-            ru_values = [v for v in VALUE_MAP['ru'] if VALUE_MAP['ru'][v] in selected]
-            data['user_values'] = ', '.join(ru_values)
-        else:
-            data['user_values'] = ', '.join(selected)
-        
-        set_session(tg_id, 'survey_role', data)
-        bot.reply_to(
-            message,
-            f"Great! ✅\n\n" + TEXTS[lang]['role_ask'],
-            reply_markup=get_roles_keyboard(lang)
-        )
     
     elif state == 'survey_role':
-        # Check role
-        if lang == 'ru':
-            valid_roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор"]
-        else:
-            valid_roles = ["Executor", "Customer", "Coordinator", "Investor"]
+        valid_roles = ["Executor", "Customer", "Coordinator", "Investor"]
         
         if text not in valid_roles:
             bot.reply_to(
@@ -629,10 +661,7 @@ def handle_survey(message: Message):
         )
     
     elif state == 'survey_format':
-        if lang == 'ru':
-            valid_formats = ["Текст", "Голос", "Видео", "Любой"]
-        else:
-            valid_formats = ["Text", "Voice", "Video", "Any"]
+        valid_formats = ["Text", "Voice", "Video", "Any"]
         
         if text not in valid_formats:
             bot.reply_to(
@@ -664,7 +693,7 @@ def handle_survey(message: Message):
             
             bot.reply_to(
                 message,
-                f"🎉 {data['name']}!\n\n" + TEXTS[lang]['profile_complete'] + "\n\n"
+                f"Profile complete!\n\n" + TEXTS[lang]['profile_complete'] + "\n\n"
                 f"Role: {data['role']}\n"
                 f"Values: {data['user_values']}\n"
                 f"Format: {data['format']}\n\n"
@@ -676,7 +705,7 @@ def handle_survey(message: Message):
             
         except Exception as e:
             logger.error(f"Error saving profile: {e}")
-            bot.reply_to(message, "❌ Error saving your profile. Please try again.")
+            bot.reply_to(message, "Error saving your profile. Please try again.")
 
 # --- MAIN ---
 if __name__ == "__main__":
@@ -692,7 +721,7 @@ if __name__ == "__main__":
         bot.infinity_polling()
         
     except KeyboardInterrupt:
-        logger.info("⏹️ Bot stopped by user (Ctrl+C)")
+        logger.info("Bot stopped by user (Ctrl+C)")
     except Exception as e:
         logger.error(f"Critical error: {e}")
         sys.exit(1)
