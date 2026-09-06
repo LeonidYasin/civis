@@ -50,10 +50,4 @@ class ProfileDatabase {
     final db = await instance.database;
     await db.delete('profiles', where: 'id = ?', whereArgs: [id]);
   }
-
-  Future<bool> hasProfile() async {
-    final db = await instance.database;
-    final result = await db.query('profiles', limit: 1);
-    return result.isNotEmpty;
-  }
 }
