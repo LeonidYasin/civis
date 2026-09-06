@@ -55,25 +55,41 @@ def init_db():
         )
     """)
     
-    # Offers table
+    # Offers table with category
     cur.execute("""
         CREATE TABLE IF NOT EXISTS offers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tg_id INTEGER,
+            category TEXT DEFAULT 'general',
             text TEXT,
             created_at TEXT
         )
     """)
     
-    # Requests table
+    # Check if category column exists in offers
+    cur.execute("PRAGMA table_info(offers)")
+    offer_columns = [col[1] for col in cur.fetchall()]
+    if 'category' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN category TEXT DEFAULT 'general'")
+        logger.info("Added 'category' column to offers table")
+    
+    # Requests table with category
     cur.execute("""
         CREATE TABLE IF NOT EXISTS requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tg_id INTEGER,
+            category TEXT DEFAULT 'general',
             text TEXT,
             created_at TEXT
         )
     """)
+    
+    # Check if category column exists in requests
+    cur.execute("PRAGMA table_info(requests)")
+    req_columns = [col[1] for col in cur.fetchall()]
+    if 'category' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN category TEXT DEFAULT 'general'")
+        logger.info("Added 'category' column to requests table")
     
     # Subscriptions table
     cur.execute("""
@@ -176,18 +192,21 @@ def clear_session(tg_id):
     conn.close()
 
 # --- OFFER FUNCTIONS ---
-def save_offer(tg_id, text):
+def save_offer(tg_id, text, category='general'):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("INSERT INTO offers (tg_id, text, created_at) VALUES (?, ?, ?)",
-                 (tg_id, text, datetime.now().isoformat()))
+    cur.execute("INSERT INTO offers (tg_id, category, text, created_at) VALUES (?, ?, ?, ?)",
+                 (tg_id, category, text, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
-def get_all_offers():
+def get_all_offers(category=None):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, tg_id, text, created_at FROM offers ORDER BY created_at DESC")
+    if category:
+        cur.execute("SELECT id, tg_id, category, text, created_at FROM offers WHERE category = ? ORDER BY created_at DESC", (category,))
+    else:
+        cur.execute("SELECT id, tg_id, category, text, created_at FROM offers ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -195,13 +214,12 @@ def get_all_offers():
 def get_my_offers(tg_id):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, text, created_at FROM offers WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    cur.execute("SELECT id, category, text, created_at FROM offers WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
 
 def delete_offer(offer_id, tg_id):
-    """Delete an offer by ID if it belongs to the user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM offers WHERE id = ? AND tg_id = ?", (offer_id, tg_id))
@@ -211,18 +229,21 @@ def delete_offer(offer_id, tg_id):
     return affected > 0
 
 # --- REQUEST FUNCTIONS ---
-def save_request(tg_id, text):
+def save_request(tg_id, text, category='general'):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("INSERT INTO requests (tg_id, text, created_at) VALUES (?, ?, ?)",
-                 (tg_id, text, datetime.now().isoformat()))
+    cur.execute("INSERT INTO requests (tg_id, category, text, created_at) VALUES (?, ?, ?, ?)",
+                 (tg_id, category, text, datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
-def get_all_requests():
+def get_all_requests(category=None):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, tg_id, text, created_at FROM requests ORDER BY created_at DESC")
+    if category:
+        cur.execute("SELECT id, tg_id, category, text, created_at FROM requests WHERE category = ? ORDER BY created_at DESC", (category,))
+    else:
+        cur.execute("SELECT id, tg_id, category, text, created_at FROM requests ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -230,13 +251,12 @@ def get_all_requests():
 def get_my_requests(tg_id):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, text, created_at FROM requests WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    cur.execute("SELECT id, category, text, created_at FROM requests WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
 
 def delete_request(req_id, tg_id):
-    """Delete a request by ID if it belongs to the user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM requests WHERE id = ? AND tg_id = ?", (req_id, tg_id))
@@ -255,7 +275,6 @@ def get_all_citizens():
     return rows
 
 def search_citizens(query):
-    """Search citizens by name, role, or values"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     search_pattern = f"%{query}%"
@@ -318,11 +337,9 @@ def can_use_match(tg_id):
         create_subscription(tg_id)
         sub = get_subscription(tg_id)
     
-    # Check if premium or has matches left
     if sub['plan'] == 'premium':
         return True
     
-    # Free plan: check limit
     return sub['matches_used'] < sub['matches_limit']
 
 def get_matches_remaining(tg_id):
