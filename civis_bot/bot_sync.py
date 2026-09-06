@@ -34,12 +34,21 @@ logger.info("Token loaded")
 
 # --- PROXY SETUP ---
 def get_proxy_url():
-    """Get proxy URL from .env or environment"""
+    """Get HTTP proxy URL from .env or environment"""
+    # First check .env
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
+        # Convert socks5 to http if needed
+        if proxy_url.startswith("socks5://"):
+            # Happ uses HTTP proxy on same port
+            port = proxy_url.split(":")[-1]
+            http_proxy = f"http://127.0.0.1:{port}"
+            logger.info(f"Converted SOCKS5 to HTTP proxy: {http_proxy}")
+            return http_proxy
         logger.info(f"Using proxy: {proxy_url}")
         return proxy_url
     
+    # Check system env
     http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
     https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
     
@@ -57,20 +66,27 @@ def get_proxy_url():
 proxy_url = get_proxy_url()
 
 if proxy_url:
-    # For HTTP/S proxy with requests
+    # For HTTP proxy with requests
     proxies = {
         'http': proxy_url,
         'https': proxy_url,
     }
+    
     # Create session with proxy
     session = requests.Session()
     session.proxies = proxies
     
+    # Test proxy connection
+    try:
+        test_response = session.get("https://api.telegram.org", timeout=10)
+        logger.info(f"Proxy test: {test_response.status_code}")
+    except Exception as e:
+        logger.warning(f"Proxy test failed: {e}")
+    
     # Create bot with custom session
     bot = TeleBot(token=TOKEN, threaded=False)
-    # Set the session
     bot.session = session
-    logger.info(f"Bot created with proxy: {proxy_url}")
+    logger.info(f"Bot created with HTTP proxy: {proxy_url}")
 else:
     bot = TeleBot(token=TOKEN, threaded=False)
     logger.info("Bot created without proxy")
@@ -144,4 +160,7 @@ if __name__ == "__main__":
         logger.info("Bot stopped by user")
     except Exception as e:
         logger.error(f"Critical error: {e}")
+        logger.error("Diagnostics:")
+        logger.error(f"  - Proxy: {proxy_url}")
+        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
         sys.exit(1)
