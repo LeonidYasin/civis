@@ -14,7 +14,8 @@ from .helpers import set_bot, bot
 # Import command modules
 from .core import (
     cmd_start, cmd_profile, cmd_embedding, cmd_citizens,
-    cmd_help, cmd_survey, cmd_status, cmd_cancel, cmd_done
+    cmd_help, cmd_survey, cmd_status, cmd_cancel, cmd_done,
+    cmd_language
 )
 from .marketplace import (
     cmd_offer, cmd_request, cmd_my_offers, cmd_my_requests,
@@ -26,7 +27,7 @@ from .dialogs import (
     cmd_process_dialogs, handle_document
 )
 from .subscription import (
-    cmd_subscribe, cmd_setkey, cmd_match, cmd_language
+    cmd_subscribe, cmd_setkey, cmd_match
 )
 from .support import (
     cmd_support, cmd_search
@@ -53,6 +54,7 @@ def register_handlers():
     bot.message_handler(commands=['status'])(cmd_status)
     bot.message_handler(commands=['cancel'])(cmd_cancel)
     bot.message_handler(commands=['done'])(cmd_done)
+    bot.message_handler(commands=['language'])(cmd_language)
     
     # Marketplace commands
     bot.message_handler(commands=['offer'])(cmd_offer)
@@ -78,7 +80,6 @@ def register_handlers():
     bot.message_handler(commands=['subscribe'])(cmd_subscribe)
     bot.message_handler(commands=['setkey'])(cmd_setkey)
     bot.message_handler(commands=['match'])(cmd_match)
-    bot.message_handler(commands=['language'])(cmd_language)
     
     # Support commands
     bot.message_handler(commands=['support'])(cmd_support)
