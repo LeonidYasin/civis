@@ -28,6 +28,13 @@ from config import get_proxy_url, ADMIN_CHAT_ID
 
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection, set_bot as set_language_bot
+from .real_estate import (
+    handle_real_estate_survey,
+    cmd_offer_real_estate,
+    cmd_request_real_estate,
+    cmd_match_property,
+    set_bot as set_real_estate_bot
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +46,7 @@ def set_bot(bot_instance):
     bot = bot_instance
     set_survey_bot(bot_instance)
     set_language_bot(bot_instance)
+    set_real_estate_bot(bot_instance)
 
 def log_message(message: Message, prefix=""):
     """Helper to log message details"""
@@ -58,6 +66,7 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
+    # Command handlers
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
@@ -83,10 +92,29 @@ def register_handlers():
     bot.message_handler(commands=['delete_request'])(cmd_delete_request)
     bot.message_handler(commands=['support'])(cmd_support)
     
+    # Real estate commands
+    bot.message_handler(commands=['offer_real_estate'])(cmd_offer_real_estate)
+    bot.message_handler(commands=['request_real_estate'])(cmd_request_real_estate)
+    bot.message_handler(commands=['match_property'])(cmd_match_property)
+    
+    # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
-    bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
+    
+    # Survey state handler (catch-all for text messages)
+    bot.message_handler(func=lambda m: True, content_types=['text'])(handle_all_text)
     
     logger.info("All handlers registered")
+
+def handle_all_text(message: Message):
+    """Route text messages to appropriate handler based on state"""
+    tg_id = message.from_user.id
+    state, _ = get_session(tg_id)
+    
+    # Check if it's a real estate state
+    if state and state.startswith('real_estate_'):
+        handle_real_estate_survey(message)
+    else:
+        handle_survey(message)
 
 # --- COMMAND HANDLERS ---
 
@@ -169,10 +197,10 @@ def cmd_offers(message: Message):
     
     text = "📦 All Offers:\n\n"
     for row in rows:
-        if len(row) == 5:
-            id, tg_id, category, offer_text, created_at = row
+        if len(row) >= 5:
+            id, tg_id, category, offer_text, created_at = row[:5]
         else:
-            tg_id, offer_text, created_at = row
+            tg_id, offer_text, created_at = row[:3]
             id = '?'
             category = 'general'
         user = get_user(tg_id)
@@ -189,10 +217,10 @@ def cmd_requests(message: Message):
     
     text = "📥 All Requests:\n\n"
     for row in rows:
-        if len(row) == 5:
-            id, tg_id, category, req_text, created_at = row
+        if len(row) >= 5:
+            id, tg_id, category, req_text, created_at = row[:5]
         else:
-            tg_id, req_text, created_at = row
+            tg_id, req_text, created_at = row[:3]
             id = '?'
             category = 'general'
         user = get_user(tg_id)
@@ -210,13 +238,22 @@ def cmd_my_offers(message: Message):
     
     text = "📦 Your Offers:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, category, offer_text, created_at = row
+        # Handle different row formats
+        if len(row) >= 9:
+            id, category, text, price, prop_type, area, address, rooms, created_at = row[:9]
+            details = f"{prop_type or 'N/A'} | ${price or 'negotiable'} | {area or '?'}m² | {rooms or '?'} rooms"
+        elif len(row) >= 4:
+            id, category, text, created_at = row[:4]
+            details = ""
         else:
-            id, offer_text, created_at = row
+            id, text, created_at = row[:3]
             category = 'general'
-        text += f"ID {id} [{category}]: {offer_text}\n"
-        text += f"To delete: /delete_offer {id}\n\n"
+            details = ""
+        text_display = f"ID {id} [{category}]: {text[:100]}"
+        if details:
+            text_display += f"\n   {details}"
+        text_display += f"\nTo delete: /delete_offer {id}\n\n"
+        text += text_display
     bot.reply_to(message, text)
 
 def cmd_my_requests(message: Message):
@@ -229,13 +266,21 @@ def cmd_my_requests(message: Message):
     
     text = "📥 Your Requests:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, category, req_text, created_at = row
+        if len(row) >= 12:
+            id, category, text, price_min, price_max, prop_type, area_min, area_max, address, rooms_min, rooms_max, created_at = row[:12]
+            details = f"{prop_type or 'Any'} | ${price_min or 'Any'}-${price_max or 'Any'} | {area_min or 'Any'}-{area_max or 'Any'}m²"
+        elif len(row) >= 4:
+            id, category, text, created_at = row[:4]
+            details = ""
         else:
-            id, req_text, created_at = row
+            id, text, created_at = row[:3]
             category = 'general'
-        text += f"ID {id} [{category}]: {req_text}\n"
-        text += f"To delete: /delete_request {id}\n\n"
+            details = ""
+        text_display = f"ID {id} [{category}]: {text[:100]}"
+        if details:
+            text_display += f"\n   {details}"
+        text_display += f"\nTo delete: /delete_request {id}\n\n"
+        text += text_display
     bot.reply_to(message, text)
 
 def cmd_delete_offer(message: Message):
@@ -296,30 +341,30 @@ def cmd_marketplace(message: Message):
     text += "📦 Offers:\n"
     if offers:
         for row in offers[:5]:
-            if len(row) == 5:
-                id, tg_id, category, offer_text, _ = row
+            if len(row) >= 5:
+                id, tg_id, category, offer_text, _ = row[:5]
             else:
-                tg_id, offer_text, _ = row
+                tg_id, offer_text, _ = row[:3]
                 id = '?'
                 category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {offer_text}\n"
+            text += f"  - #{id} [{category}] {name}: {offer_text[:50]}...\n"
     else:
         text += "  (none)\n"
     
     text += "\n📥 Requests:\n"
     if requests:
         for row in requests[:5]:
-            if len(row) == 5:
-                id, tg_id, category, req_text, _ = row
+            if len(row) >= 5:
+                id, tg_id, category, req_text, _ = row[:5]
             else:
-                tg_id, req_text, _ = row
+                tg_id, req_text, _ = row[:3]
                 id = '?'
                 category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {req_text}\n"
+            text += f"  - #{id} [{category}] {name}: {req_text[:50]}...\n"
     else:
         text += "  (none)\n"
     
