@@ -23,10 +23,15 @@ from keyboards import (
     get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
 from utils import get_text, get_embedding_profile
-from config import get_proxy_url, ADMIN_CHAT_ID
+from config import get_proxy_url
 
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection, set_bot as set_language_bot
+from .categories import (
+    cmd_taxi, cmd_taxi_offer, cmd_taxi_request,
+    cmd_delivery, cmd_delivery_offer, cmd_delivery_request,
+    set_bot as set_categories_bot
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,17 +43,7 @@ def set_bot(bot_instance):
     bot = bot_instance
     set_survey_bot(bot_instance)
     set_language_bot(bot_instance)
-
-def log_message(message: Message, prefix=""):
-    """Helper to log message details"""
-    tg_id = message.from_user.id
-    username = message.from_user.username or "unknown"
-    chat_type = message.chat.type
-    chat_id = message.chat.id
-    text = message.text or ""
-    logger.info(f"{prefix} msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
-    if chat_type in ['group', 'supergroup']:
-        logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
+    set_categories_bot(bot_instance)
 
 # --- REGISTRATION ---
 
@@ -57,7 +52,6 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
-    # Register handlers WITHOUT a catch-all logger that blocks
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
@@ -83,10 +77,18 @@ def register_handlers():
     bot.message_handler(commands=['delete_request'])(cmd_delete_request)
     bot.message_handler(commands=['support'])(cmd_support)
     
+    # --- CATEGORY COMMANDS ---
+    bot.message_handler(commands=['taxi'])(cmd_taxi)
+    bot.message_handler(commands=['taxi_offer'])(cmd_taxi_offer)
+    bot.message_handler(commands=['taxi_request'])(cmd_taxi_request)
+    bot.message_handler(commands=['delivery'])(cmd_delivery)
+    bot.message_handler(commands=['delivery_offer'])(cmd_delivery_offer)
+    bot.message_handler(commands=['delivery_request'])(cmd_delivery_request)
+    
     # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages — must be last)
+    # Survey state handler
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
@@ -94,7 +96,6 @@ def register_handlers():
 # --- COMMAND HANDLERS ---
 
 def cmd_start(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
@@ -117,7 +118,6 @@ def cmd_start(message: Message):
     )
 
 def cmd_profile(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -137,7 +137,6 @@ def cmd_profile(message: Message):
     bot.reply_to(message, profile_text)
 
 def cmd_embedding(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -152,7 +151,6 @@ def cmd_embedding(message: Message):
     )
 
 def cmd_citizens(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_all_citizens()
     if not rows:
@@ -165,7 +163,6 @@ def cmd_citizens(message: Message):
     bot.reply_to(message, text)
 
 def cmd_offers(message: Message):
-    log_message(message, "[CMD]")
     rows = get_all_offers()
     if not rows:
         bot.reply_to(message, "No offers yet. Use /offer to publish one!")
@@ -173,18 +170,19 @@ def cmd_offers(message: Message):
     
     text = "📦 All Offers:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, tg_id, offer_text, created_at = row
+        if len(row) == 5:
+            id, tg_id, category, offer_text, created_at = row
         else:
             tg_id, offer_text, created_at = row
             id = '?'
+            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} - @{name}: {offer_text}\n\n"
+        category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+        text += f"ID {id} {category_emoji} @{name}: {offer_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_requests(message: Message):
-    log_message(message, "[CMD]")
     rows = get_all_requests()
     if not rows:
         bot.reply_to(message, "No requests yet. Use /request to publish one!")
@@ -192,18 +190,19 @@ def cmd_requests(message: Message):
     
     text = "📥 All Requests:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, tg_id, req_text, created_at = row
+        if len(row) == 5:
+            id, tg_id, category, req_text, created_at = row
         else:
             tg_id, req_text, created_at = row
             id = '?'
+            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} - @{name}: {req_text}\n\n"
+        category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+        text += f"ID {id} {category_emoji} @{name}: {req_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_my_offers(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_my_offers(tg_id)
     if not rows:
@@ -211,13 +210,18 @@ def cmd_my_offers(message: Message):
         return
     
     text = "📦 Your Offers:\n\n"
-    for id, offer_text, created_at in rows:
-        text += f"ID {id}: {offer_text}\n"
+    for row in rows:
+        if len(row) == 4:
+            id, category, offer_text, created_at = row
+        else:
+            id, offer_text, created_at = row
+            category = 'general'
+        category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+        text += f"ID {id} {category_emoji}: {offer_text}\n"
         text += f"To delete: /delete_offer {id}\n\n"
     bot.reply_to(message, text)
 
 def cmd_my_requests(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_my_requests(tg_id)
     if not rows:
@@ -225,13 +229,18 @@ def cmd_my_requests(message: Message):
         return
     
     text = "📥 Your Requests:\n\n"
-    for id, req_text, created_at in rows:
-        text += f"ID {id}: {req_text}\n"
+    for row in rows:
+        if len(row) == 4:
+            id, category, req_text, created_at = row
+        else:
+            id, req_text, created_at = row
+            category = 'general'
+        category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+        text += f"ID {id} {category_emoji}: {req_text}\n"
         text += f"To delete: /delete_request {id}\n\n"
     bot.reply_to(message, text)
 
 def cmd_delete_offer(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -255,7 +264,6 @@ def cmd_delete_offer(message: Message):
         bot.reply_to(message, f"❌ Offer #{offer_id} not found or you don't have permission to delete it.")
 
 def cmd_delete_request(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -279,7 +287,6 @@ def cmd_delete_request(message: Message):
         bot.reply_to(message, f"❌ Request #{req_id} not found or you don't have permission to delete it.")
 
 def cmd_marketplace(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     offers = get_all_offers()
     requests = get_all_requests()
@@ -288,39 +295,45 @@ def cmd_marketplace(message: Message):
     text += "📦 Offers:\n"
     if offers:
         for row in offers[:5]:
-            if len(row) == 4:
-                id, tg_id, offer_text, _ = row
+            if len(row) == 5:
+                id, tg_id, category, offer_text, _ = row
             else:
                 tg_id, offer_text, _ = row
                 id = '?'
+                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} {name}: {offer_text}\n"
+            category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+            text += f"  #{id} {category_emoji} {name}: {offer_text}\n"
     else:
         text += "  (none)\n"
     
     text += "\n📥 Requests:\n"
     if requests:
         for row in requests[:5]:
-            if len(row) == 4:
-                id, tg_id, req_text, _ = row
+            if len(row) == 5:
+                id, tg_id, category, req_text, _ = row
             else:
                 tg_id, req_text, _ = row
                 id = '?'
+                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} {name}: {req_text}\n"
+            category_emoji = "🚕" if category == 'taxi' else "📦" if category == 'delivery' else "📌"
+            text += f"  #{id} {category_emoji} {name}: {req_text}\n"
     else:
         text += "  (none)\n"
+    
+    text += "\n📌 Categories:\n"
+    text += "  /taxi - Taxi marketplace\n"
+    text += "  /delivery - Delivery marketplace"
     
     bot.reply_to(message, text)
 
 def cmd_help(message: Message):
-    log_message(message, "[CMD]")
     bot.reply_to(message, get_text(message.from_user.id, 'help'))
 
 def cmd_survey(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     lang = user.get('language', 'en') if user else 'en'
@@ -328,7 +341,6 @@ def cmd_survey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'name_ask'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_status(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     try:
         me = bot.get_me()
@@ -340,6 +352,15 @@ def cmd_status(message: Message):
         offers_count = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM requests")
         requests_count = cur.fetchone()[0]
+        # Count taxi and delivery
+        cur.execute("SELECT COUNT(*) FROM offers WHERE category = 'taxi'")
+        taxi_offers = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM requests WHERE category = 'taxi'")
+        taxi_requests = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM offers WHERE category = 'delivery'")
+        delivery_offers = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM requests WHERE category = 'delivery'")
+        delivery_requests = cur.fetchone()[0]
         conn.close()
         bot.reply_to(
             message,
@@ -347,19 +368,19 @@ def cmd_status(message: Message):
             f"Citizens: {count}\n"
             f"Offers: {offers_count}\n"
             f"Requests: {requests_count}\n"
+            f"🚕 Taxi: {taxi_offers} offers, {taxi_requests} requests\n"
+            f"📦 Delivery: {delivery_offers} offers, {delivery_requests} requests\n"
             f"Proxy: {get_proxy_url() or 'None'}"
         )
     except Exception as e:
         bot.reply_to(message, f"Error: {e}")
 
 def cmd_cancel(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     clear_session(tg_id)
     bot.reply_to(message, get_text(tg_id, 'cancel'))
 
 def cmd_done(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     state, data = get_session(tg_id)
     if state != 'survey_values':
@@ -379,7 +400,6 @@ def cmd_done(message: Message):
     bot.reply_to(message, TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'], reply_markup=get_roles_keyboard(lang))
 
 def cmd_offer(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -391,7 +411,6 @@ def cmd_offer(message: Message):
     bot.reply_to(message, get_text(tg_id, 'offer_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_request(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -403,7 +422,6 @@ def cmd_request(message: Message):
     bot.reply_to(message, get_text(tg_id, 'request_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_language(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     logger.info(f"Received /language from {tg_id}")
     
@@ -415,7 +433,6 @@ def cmd_language(message: Message):
     )
 
 def cmd_subscribe(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     
     user = get_user(tg_id)
@@ -451,7 +468,6 @@ def cmd_subscribe(message: Message):
     bot.reply_to(message, text)
 
 def cmd_setkey(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -472,7 +488,6 @@ def cmd_setkey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'setkey_saved'))
 
 def cmd_match(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -519,7 +534,6 @@ About: {user.get('about_text', 'N/A')}"""
     )
 
 def cmd_search(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -552,7 +566,6 @@ def cmd_search(message: Message):
     bot.reply_to(message, text)
 
 def cmd_support(message: Message):
-    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
