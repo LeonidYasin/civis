@@ -9,7 +9,7 @@ import os
 import sys
 from datetime import datetime
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
@@ -65,13 +65,16 @@ async def create_bot_with_proxy():
     if proxy_url:
         from aiohttp_socks import ProxyConnector
         connector = ProxyConnector.from_url(proxy_url)
+        # Create aiohttp session with connector
         aiohttp_session = aiohttp.ClientSession(connector=connector)
+        # Create aiogram session from aiohttp session
         aiogram_session = AiohttpSession(session=aiohttp_session)
+        # Create bot with session
         return Bot(token=TOKEN, session=aiogram_session)
     else:
         return Bot(token=TOKEN)
 
-# --- HANDLERS (defined as functions) ---
+# --- HANDLERS ---
 async def cmd_start(message: Message):
     """Handler for /start command"""
     logger.info(f"Received /start from {message.from_user.id}")
