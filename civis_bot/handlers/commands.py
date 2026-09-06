@@ -22,8 +22,8 @@ from keyboards import (
     get_main_keyboard, get_language_keyboard,
     get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
-from utils import get_text, get_embedding_profile, find_matches, generate_match_explanation, get_profile_text
-from config import get_proxy_url, ADMIN_CHAT_ID
+from utils import get_text, get_embedding_profile, find_matches, generate_match_explanation
+from config import get_proxy_url
 
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection, set_bot as set_language_bot
@@ -57,7 +57,6 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
-    # Register handlers
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
@@ -86,7 +85,7 @@ def register_handlers():
     # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages)
+    # Survey state handler
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
@@ -173,15 +172,14 @@ def cmd_offers(message: Message):
     
     text = "📦 All Offers:\n\n"
     for row in rows:
-        if len(row) == 5:
-            id, tg_id, category, offer_text, created_at = row
+        if len(row) == 4:
+            id, tg_id, offer_text, created_at = row
         else:
             tg_id, offer_text, created_at = row
             id = '?'
-            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} [{category}] - @{name}: {offer_text}\n\n"
+        text += f"ID {id} - @{name}: {offer_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_requests(message: Message):
@@ -193,15 +191,14 @@ def cmd_requests(message: Message):
     
     text = "📥 All Requests:\n\n"
     for row in rows:
-        if len(row) == 5:
-            id, tg_id, category, req_text, created_at = row
+        if len(row) == 4:
+            id, tg_id, req_text, created_at = row
         else:
             tg_id, req_text, created_at = row
             id = '?'
-            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} [{category}] - @{name}: {req_text}\n\n"
+        text += f"ID {id} - @{name}: {req_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_my_offers(message: Message):
@@ -213,8 +210,8 @@ def cmd_my_offers(message: Message):
         return
     
     text = "📦 Your Offers:\n\n"
-    for id, category, offer_text, created_at in rows:
-        text += f"ID {id} [{category}]: {offer_text}\n"
+    for id, offer_text, created_at in rows:
+        text += f"ID {id}: {offer_text}\n"
         text += f"To delete: /delete_offer {id}\n\n"
     bot.reply_to(message, text)
 
@@ -227,8 +224,8 @@ def cmd_my_requests(message: Message):
         return
     
     text = "📥 Your Requests:\n\n"
-    for id, category, req_text, created_at in rows:
-        text += f"ID {id} [{category}]: {req_text}\n"
+    for id, req_text, created_at in rows:
+        text += f"ID {id}: {req_text}\n"
         text += f"To delete: /delete_request {id}\n\n"
     bot.reply_to(message, text)
 
@@ -290,30 +287,28 @@ def cmd_marketplace(message: Message):
     text += "📦 Offers:\n"
     if offers:
         for row in offers[:5]:
-            if len(row) == 5:
-                id, tg_id, category, offer_text, _ = row
+            if len(row) == 4:
+                id, tg_id, offer_text, _ = row
             else:
                 tg_id, offer_text, _ = row
                 id = '?'
-                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {offer_text}\n"
+            text += f"  - #{id} {name}: {offer_text}\n"
     else:
         text += "  (none)\n"
     
     text += "\n📥 Requests:\n"
     if requests:
         for row in requests[:5]:
-            if len(row) == 5:
-                id, tg_id, category, req_text, _ = row
+            if len(row) == 4:
+                id, tg_id, req_text, _ = row
             else:
                 tg_id, req_text, _ = row
                 id = '?'
-                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {req_text}\n"
+            text += f"  - #{id} {name}: {req_text}\n"
     else:
         text += "  (none)\n"
     
@@ -476,23 +471,12 @@ def cmd_setkey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'setkey_saved'))
 
 def cmd_match(message: Message):
-    """AI-powered matching - REAL implementation"""
+    """AI-powered matching with OpenAI or local fallback"""
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
-    
     if not user or user.get('status') != 'completed':
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
-        return
-    
-    # Check if OpenAI key is set
-    openai_key = get_openai_key(tg_id)
-    if not openai_key:
-        bot.reply_to(
-            message,
-            get_text(tg_id, 'setkey_required'),
-            parse_mode='Markdown'
-        )
         return
     
     # Check subscription
@@ -504,69 +488,64 @@ def cmd_match(message: Message):
         )
         return
     
-    # Send "thinking" message
-    thinking_msg = bot.reply_to(message, "🔍 Analyzing your profile and finding matches...")
+    # Check if OpenAI key is set or local model is available
+    openai_key = get_openai_key(tg_id)
     
+    # Try to find matches
     try:
-        # Find matches using AI
-        matches = find_matches(tg_id, openai_key, limit=5)
-        
-        if matches is None:
-            bot.edit_message_text(
-                "❌ Error generating your profile embedding. Please try again later.",
-                chat_id=thinking_msg.chat.id,
-                message_id=thinking_msg.message_id
-            )
-            return
-        
-        if not matches:
-            bot.edit_message_text(
-                "🤔 No matches found yet. Try updating your profile with more details!\n\n"
-                "Use `/survey` to update your profile.",
-                chat_id=thinking_msg.chat.id,
-                message_id=thinking_msg.message_id
-            )
-            return
-        
-        # Increment matches used
-        increment_matches_used(tg_id)
-        remaining = get_matches_remaining(tg_id)
-        remaining_text = str(remaining) if remaining != float('inf') else '∞'
-        
-        # Build results with explanations
-        lang = user.get('language', 'en')
-        text = f"🤝 **Your Top Matches**\n\n"
-        
-        for i, match in enumerate(matches, 1):
-            explanation = generate_match_explanation(user, match)
-            text += f"{i}. **{match['name']}** (@{match['username']})\n"
-            text += f"   🎯 Match score: {match['score']}%\n"
-            text += f"   💼 Role: {match['role']}\n"
-            text += f"   💎 Values: {match['values']}\n"
-            text += f"   📝 {explanation}\n\n"
-        
-        # Add footer with remaining matches
-        if remaining_text != '∞':
-            text += f"\n---\n📊 Matches remaining this month: **{remaining_text}**\n"
-        else:
-            text += f"\n---\n⭐ Premium plan — unlimited matches!"
-        
-        text += "\n\n💡 Use `/survey` to update your profile for better matches."
-        
-        bot.edit_message_text(
-            text,
-            chat_id=thinking_msg.chat.id,
-            message_id=thinking_msg.message_id,
-            parse_mode='Markdown'
-        )
-        
+        matches = find_matches(tg_id, openai_key)
     except Exception as e:
         logger.error(f"Match error: {e}")
-        bot.edit_message_text(
-            f"❌ Error during matching: {str(e)}\n\nPlease try again later.",
-            chat_id=thinking_msg.chat.id,
-            message_id=thinking_msg.message_id
+        # Try with fallback if OpenAI failed
+        if openai_key:
+            logger.info("Retrying with local fallback...")
+            matches = find_matches(tg_id, None)
+        else:
+            bot.reply_to(
+                message,
+                "❌ Error during matching. Please try again later."
+            )
+            return
+    
+    if matches is None:
+        bot.reply_to(
+            message,
+            "❌ Could not generate embedding. Please try again or set an OpenAI key via /setkey."
         )
+        return
+    
+    if not matches:
+        bot.reply_to(
+            message,
+            "🔍 No matches found. Try updating your profile with more details!"
+        )
+        return
+    
+    # Increment matches used
+    increment_matches_used(tg_id)
+    
+    # Format results
+    lang = user.get('language', 'en')
+    
+    # Check which provider was used
+    provider = "OpenAI" if openai_key else "Local AI"
+    
+    text = f"🤝 **Your Top Matches** (via {provider})\n\n"
+    
+    for i, match in enumerate(matches[:5], 1):
+        text += f"{i}. @{match.get('username', 'unknown')} - {match.get('name', 'Unknown')}\n"
+        text += f"   Role: {match.get('role', 'N/A')}\n"
+        text += f"   Values: {match.get('values', 'N/A')}\n"
+        text += f"   Match score: {match.get('score', 0)}%\n"
+        # Add explanation
+        explanation = generate_match_explanation(user, match)
+        text += f"   Why: {explanation}\n\n"
+    
+    remaining = get_matches_remaining(tg_id)
+    remaining_text = str(remaining) if remaining != float('inf') else 'unlimited'
+    text += f"\n---\nMatches remaining: {remaining_text}"
+    
+    bot.reply_to(message, text, parse_mode='Markdown')
 
 def cmd_search(message: Message):
     log_message(message, "[CMD]")
