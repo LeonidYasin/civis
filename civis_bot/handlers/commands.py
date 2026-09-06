@@ -23,7 +23,7 @@ from keyboards import (
     get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
 from utils import get_text, get_embedding_profile
-from config import get_proxy_url, ADMIN_CHAT_ID
+from config import get_proxy_url
 
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection, set_bot as set_language_bot
@@ -516,55 +516,15 @@ def cmd_search(message: Message):
     bot.reply_to(message, text)
 
 def cmd_support(message: Message):
-    """Send support message to developer"""
+    """Contact developer support"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
-    
-    # Get the message text (everything after /support)
-    parts = message.text.split()
-    if len(parts) < 2:
-        bot.reply_to(
-            message,
-            get_text(tg_id, 'support_prompt')
-        )
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    support_text = ' '.join(parts[1:])
-    
-    # Get user info
-    username = message.from_user.username or "unknown"
-    name = user.get('name', 'Unknown') if user else 'Unknown'
-    
-    # Prepare message for admin
-    admin_message = f"""📩 New Support Message
-
-From: {name}
-Username: @{username}
-User ID: {tg_id}
-
-Message:
-{support_text}
-
----
-Reply to this user by sending a message to @{username} (if available)."""
-    
-    # Send to admin
-    sent = False
-    if ADMIN_CHAT_ID:
-        try:
-            bot.send_message(ADMIN_CHAT_ID, admin_message)
-            sent = True
-            logger.info(f"Support message from {tg_id} sent to admin")
-        except Exception as e:
-            logger.error(f"Failed to send support message to admin: {e}")
-    else:
-        logger.warning("ADMIN_CHAT_ID not set, support message not forwarded")
-    
-    # Reply to user
-    if sent:
-        bot.reply_to(message, get_text(tg_id, 'support_sent'))
-    else:
-        bot.reply_to(message, get_text(tg_id, 'support_error'))
+    set_session(tg_id, 'support', {'language': user.get('language', 'en')})
+    bot.reply_to(message, get_text(tg_id, 'support_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def get_user_by_username(username):
     conn = sqlite3.connect(DB_PATH)
