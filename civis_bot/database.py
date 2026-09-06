@@ -55,6 +55,19 @@ def init_db():
         )
     """)
     
+    # Dialog files table (for uploaded conversation history)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS dialog_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id INTEGER,
+            filename TEXT,
+            content TEXT,
+            file_type TEXT,
+            processed BOOLEAN DEFAULT 0,
+            created_at TEXT
+        )
+    """)
+    
     # Offers table with category and extended fields
     cur.execute("""
         CREATE TABLE IF NOT EXISTS offers (
@@ -162,6 +175,7 @@ def init_db():
             tg_id INTEGER PRIMARY KEY,
             embedding TEXT,
             provider TEXT,
+            dialog_hash TEXT,
             updated_at TEXT
         )
     """)
@@ -253,16 +267,75 @@ def clear_session(tg_id):
     conn.commit()
     conn.close()
 
+# --- DIALOG FILE FUNCTIONS ---
+def save_dialog_file(tg_id, filename, content, file_type='txt'):
+    """Save uploaded dialog file content"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO dialog_files (tg_id, filename, content, file_type, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (tg_id, filename, content, file_type, datetime.now().isoformat()))
+    file_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return file_id
+
+def get_user_dialog_files(tg_id, processed=None):
+    """Get dialog files for a user"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if processed is None:
+        cur.execute("SELECT id, filename, content, file_type, processed FROM dialog_files WHERE tg_id = ?", (tg_id,))
+    else:
+        cur.execute("SELECT id, filename, content, file_type, processed FROM dialog_files WHERE tg_id = ? AND processed = ?", (tg_id, processed))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def get_user_dialog_text(tg_id):
+    """Get combined text from all processed dialog files"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT content FROM dialog_files WHERE tg_id = ? AND processed = 1", (tg_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return "\n\n".join([row[0] for row in rows])
+
+def mark_dialog_processed(file_id):
+    """Mark a dialog file as processed"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("UPDATE dialog_files SET processed = 1 WHERE id = ?", (file_id,))
+    conn.commit()
+    conn.close()
+
+def delete_dialog_file(file_id, tg_id):
+    """Delete a dialog file"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM dialog_files WHERE id = ? AND tg_id = ?", (file_id, tg_id))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+def get_dialog_hash(tg_id):
+    """Get hash of user's dialog text for cache invalidation"""
+    text = get_user_dialog_text(tg_id)
+    if text:
+        import hashlib
+        return hashlib.md5(text.encode()).hexdigest()
+    return None
+
 # --- OFFER FUNCTIONS ---
 def save_offer(tg_id, text, category='general', **kwargs):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
-    # Build insert query dynamically
     fields = ['tg_id', 'category', 'text', 'created_at']
     values = [tg_id, category, text, datetime.now().isoformat()]
     
-    # Add optional fields
     optional_fields = ['price', 'property_type', 'property_area', 'property_address', 'property_rooms']
     for field in optional_fields:
         if field in kwargs and kwargs[field] is not None:
@@ -317,11 +390,9 @@ def save_request(tg_id, text, category='general', **kwargs):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
-    # Build insert query dynamically
     fields = ['tg_id', 'category', 'text', 'created_at']
     values = [tg_id, category, text, datetime.now().isoformat()]
     
-    # Add optional fields
     optional_fields = ['price_min', 'price_max', 'property_type', 'property_area_min', 
                       'property_area_max', 'property_address', 'property_rooms_min', 'property_rooms_max']
     for field in optional_fields:
@@ -379,8 +450,7 @@ def delete_request(req_id, tg_id):
     return affected > 0
 
 def find_matching_offers_for_request(req_tg_id, limit=10):
-    """Find offers that match a request using AI embeddings"""
-    # Get the request
+    """Find offers that match a request using rule-based matching"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -395,7 +465,6 @@ def find_matching_offers_for_request(req_tg_id, limit=10):
     if not req:
         return []
     
-    # Get all real estate offers
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -408,7 +477,6 @@ def find_matching_offers_for_request(req_tg_id, limit=10):
     if not offers:
         return []
     
-    # Simple rule-based matching (will be enhanced with AI later)
     matches = []
     req_price_min = req[3] or 0
     req_price_max = req[4] or float('inf')
@@ -421,19 +489,12 @@ def find_matching_offers_for_request(req_tg_id, limit=10):
     for offer in offers:
         offer_id, tg_id, text, price, prop_type, area, address, rooms = offer
         
-        # Check price range
         if price and (price < req_price_min or price > req_price_max):
             continue
-        
-        # Check property type
         if req_type and prop_type and req_type.lower() != prop_type.lower():
             continue
-        
-        # Check area range
         if area and (area < req_area_min or area > req_area_max):
             continue
-        
-        # Check rooms range
         if rooms and (rooms < req_rooms_min or rooms > req_rooms_max):
             continue
         
@@ -451,8 +512,7 @@ def find_matching_offers_for_request(req_tg_id, limit=10):
     return matches[:limit]
 
 def find_matching_requests_for_offer(offer_tg_id, limit=10):
-    """Find requests that match an offer using AI embeddings"""
-    # Get the offer
+    """Find requests that match an offer using rule-based matching"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -465,7 +525,6 @@ def find_matching_requests_for_offer(offer_tg_id, limit=10):
     if not offer:
         return []
     
-    # Get all real estate requests
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -480,7 +539,6 @@ def find_matching_requests_for_offer(offer_tg_id, limit=10):
     if not requests:
         return []
     
-    # Simple rule-based matching
     matches = []
     offer_price = offer[3]
     offer_type = offer[4]
@@ -490,25 +548,18 @@ def find_matching_requests_for_offer(offer_tg_id, limit=10):
     for req in requests:
         req_id, tg_id, text, price_min, price_max, req_type, area_min, area_max, address, rooms_min, rooms_max = req
         
-        # Check price range
         if offer_price:
             if price_min and offer_price < price_min:
                 continue
             if price_max and offer_price > price_max:
                 continue
-        
-        # Check property type
         if req_type and offer_type and req_type.lower() != offer_type.lower():
             continue
-        
-        # Check area range
         if offer_area:
             if area_min and offer_area < area_min:
                 continue
             if area_max and offer_area > area_max:
                 continue
-        
-        # Check rooms range
         if offer_rooms:
             if rooms_min and offer_rooms < rooms_min:
                 continue
