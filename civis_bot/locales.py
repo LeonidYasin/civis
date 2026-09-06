@@ -23,12 +23,12 @@ TEXTS = {
         'format_ask': "Which communication format is convenient for you?",
         'format_error': "Please select a format from the buttons.",
         'profile_complete': "Congratulations! You are now a citizen of Civis!",
-        'welcome_citizen': "Welcome to Civis, {name}!\n\nYou are now a citizen. You can:\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/language - Change language\n/profile - View your profile\n/survey - Update your profile",
+        'welcome_citizen': "Welcome to Civis, {name}!\n\nYou are now a citizen. You can:\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/language - Change language\n/profile - View your profile\n/survey - Update your profile\n/subscribe - View subscription plans\n/match - AI-powered matching",
         'cancel': "Cancelled.",
         'unknown': "Use /start to create your profile or /help for commands.",
         'profile': "Profile:",
         'no_profile': "You don't have a profile yet. Use /start to create one!",
-        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/language - Change language\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
+        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/language - Change language\n/subscribe - View subscription plans\n/match - AI-powered matching\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
         'status': "Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
         'done_button': "/done",
         'marketplace_empty': "Marketplace is empty. Use /offer or /request to publish something.",
@@ -37,6 +37,21 @@ TEXTS = {
         'offer_saved': "Your offer has been published!",
         'request_saved': "Your request has been published!",
         'language_instruction': "Send /language to change language at any time.",
+        'subscribe_title': "💳 Subscription Plans",
+        'subscribe_current': "Current plan: {plan}",
+        'subscribe_remaining': "Matches remaining: {remaining}",
+        'subscribe_free': "📌 Free — $0/month\n  • 3 matches/month\n  • Basic profile\n  • View citizens",
+        'subscribe_premium': "⭐ Premium — $9.99/month\n  • Unlimited matches\n  • Priority in search\n  • Export profile (JSON)\n  • Early access to new features",
+        'subscribe_lifetime': "🚀 Lifetime — $99 one-time\n  • All Premium features\n  • MCP tools access\n  • Lifetime updates",
+        'subscribe_upgrade': "To upgrade, send /setkey to use your own OpenAI key, or contact @civis_support for payment.",
+        'setkey_prompt': "Please provide your OpenAI API key:\n`/setkey sk-...`\n\nYou can get your key at: https://platform.openai.com/api-keys",
+        'setkey_invalid': "❌ Invalid OpenAI key format. It should start with 'sk-'. Please check and try again.",
+        'setkey_saved': "✅ OpenAI key saved successfully! You can now use /match for AI-powered matching.",
+        'setkey_required': "❌ You need to set your OpenAI API key first.\nUse `/setkey sk-...` to set your key.",
+        'match_no_citizens': "No citizens to match with yet. Come back later!",
+        'match_no_others': "No other citizens to match with yet. Share the bot with friends!",
+        'match_in_progress': "🔍 AI Matching in progress...\n\nYour profile:\n{profile}\n\nWe're analyzing {count} other citizens.\nFull AI matching coming soon!",
+        'match_limit_exceeded': "❌ You've used all your free matches.\nRemaining: {remaining}\nUse `/subscribe` to upgrade to Premium.",
         'values_list': "Honesty, Expertise, Initiative, Reliability, Speed, Empathy, Systematic, Creativity, Openness, Ambition",
         'buttons': {
             'offer': "/offer",
@@ -64,12 +79,12 @@ TEXTS = {
         'format_ask': "Какой формат общения вам удобен?",
         'format_error': "Пожалуйста, выберите формат из кнопок.",
         'profile_complete': "Поздравляем! Теперь вы гражданин Civis!",
-        'welcome_citizen': "Добро пожаловать в Civis, {name}!\n\nТеперь вы гражданин. Вы можете:\n/offer - Опубликовать предложение\n/request - Опубликовать запрос\n/marketplace - Посмотреть маркетплейс\n/language - Сменить язык\n/profile - Посмотреть профиль\n/survey - Обновить профиль",
+        'welcome_citizen': "Добро пожаловать в Civis, {name}!\n\nТеперь вы гражданин. Вы можете:\n/offer - Опубликовать предложение\n/request - Опубликовать запрос\n/marketplace - Посмотреть маркетплейс\n/language - Сменить язык\n/profile - Посмотреть профиль\n/survey - Обновить профиль\n/subscribe - Посмотреть тарифы\n/match - ИИ-матчинг",
         'cancel': "Отменено.",
         'unknown': "Используйте /start для создания профиля или /help для помощи.",
         'profile': "Профиль:",
         'no_profile': "У вас ещё нет профиля. Используйте /start, чтобы создать его!",
-        'help': "Civis Бот\n\n/start - Создать профиль\n/profile - Мой профиль\n/survey - Обновить профиль\n/offer - Опубликовать предложение\n/request - Опубликовать запрос\n/marketplace - Посмотреть маркетплейс\n/language - Сменить язык\n/status - Статус бота\n/cancel - Отменить текущую операцию\n/help - Помощь",
+        'help': "Civis Бот\n\n/start - Создать профиль\n/profile - Мой профиль\n/survey - Обновить профиль\n/offer - Опубликовать предложение\n/request - Опубликовать запрос\n/marketplace - Посмотреть маркетплейс\n/language - Сменить язык\n/subscribe - Посмотреть тарифы\n/match - ИИ-матчинг\n/status - Статус бота\n/cancel - Отменить текущую операцию\n/help - Помощь",
         'status': "Civis Бот\n\nПрофилей: {count}\nПрокси: {proxy}",
         'done_button': "/done",
         'marketplace_empty': "Маркетплейс пуст. Используйте /offer или /request, чтобы что-то опубликовать.",
@@ -78,6 +93,21 @@ TEXTS = {
         'offer_saved': "Ваше предложение опубликовано!",
         'request_saved': "Ваш запрос опубликован!",
         'language_instruction': "Отправьте /language, чтобы сменить язык в любой момент.",
+        'subscribe_title': "💳 Тарифы",
+        'subscribe_current': "Текущий тариф: {plan}",
+        'subscribe_remaining': "Осталось матчей: {remaining}",
+        'subscribe_free': "📌 Бесплатный — $0/мес\n  • 3 матча в месяц\n  • Базовый профиль\n  • Просмотр граждан",
+        'subscribe_premium': "⭐ Премиум — $9.99/мес\n  • Безлимитные матчи\n  • Приоритет в поиске\n  • Экспорт профиля (JSON)\n  • Ранний доступ к новым функциям",
+        'subscribe_lifetime': "🚀 Навсегда — $99 разово\n  • Все функции Премиум\n  • Доступ к MCP-инструментам\n  • Пожизненные обновления",
+        'subscribe_upgrade': "Чтобы перейти на платный тариф, отправьте /setkey со своим OpenAI ключом, или напишите @civis_support для оплаты.",
+        'setkey_prompt': "Пожалуйста, введите ваш OpenAI API ключ:\n`/setkey sk-...`\n\nПолучить ключ можно здесь: https://platform.openai.com/api-keys",
+        'setkey_invalid': "❌ Неверный формат OpenAI ключа. Он должен начинаться с 'sk-'. Пожалуйста, проверьте и попробуйте снова.",
+        'setkey_saved': "✅ OpenAI ключ сохранён! Теперь вы можете использовать /match для ИИ-матчинга.",
+        'setkey_required': "❌ Вам нужно сначала установить OpenAI API ключ.\nИспользуйте `/setkey sk-...` чтобы установить ключ.",
+        'match_no_citizens': "Нет граждан для матчинга. Зайдите позже!",
+        'match_no_others': "Нет других граждан для матчинга. Поделитесь ботом с друзьями!",
+        'match_in_progress': "🔍 ИИ-матчинг в процессе...\n\nВаш профиль:\n{profile}\n\nАнализируем {count} других граждан.\nПолный ИИ-матчинг скоро будет доступен!",
+        'match_limit_exceeded': "❌ Вы использовали все бесплатные матчи.\nОсталось: {remaining}\nИспользуйте `/subscribe` чтобы перейти на Премиум.",
         'values_list': "Честность, Экспертиза, Инициатива, Надёжность, Скорость, Эмпатия, Системность, Креативность, Открытость, Амбициозность",
         'buttons': {
             'offer': "/offer",
@@ -126,8 +156,8 @@ def get_value_buttons(lang):
 def get_roles(lang):
     """Get roles for the given language"""
     if lang == 'ru':
-        return ["Исполнитель", "Заказчик", "Координатор", "Инвестор"]
-    return ["Executor", "Customer", "Coordinator", "Investor"]
+        return ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
+    return ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
 
 def get_formats(lang):
     """Get formats for the given language"""
