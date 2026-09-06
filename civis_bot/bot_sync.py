@@ -201,8 +201,9 @@ Let's create your profile!""",
         'name_ask': "What is your name?",
         'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
         'about_short': "That's a bit short. Could you tell me a little more about yourself?",
-        'values_ask': "Select 3 key values that you share in your work:",
-        'values_error': "Please select exactly 3 values from the buttons.",
+        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just type them separated by commas, or click the buttons one by one.)",
+        'values_ask': "List your 3 key values (e.g. Honesty, Expertise, Speed):",
+        'values_error': "Please select exactly 3 values. Write them separated by commas, or click the buttons one by one.",
         'role_ask': "What is your main role?",
         'role_error': "Please select a role from the buttons.",
         'format_ask': "Which communication format is convenient for you?",
@@ -214,6 +215,7 @@ Let's create your profile!""",
         'no_profile': "You don't have a profile yet. Use /start to create one!",
         'help': "📚 Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
         'status': "🤖 Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
+        'values_list': "Honesty, Expertise, Initiative, Reliability, Speed, Empathy, Systematic, Creativity, Openness, Ambition",
     },
     'ru': {
         'welcome': """🏛️ Добро пожаловать в Civis!
@@ -230,8 +232,9 @@ Civis — это Республика Профессионалов — сооб�
         'name_ask': "Как вас зовут?",
         'about_ask': "Расскажите немного о себе и своих профессиональных целях.\n(Достаточно пары предложений.)",
         'about_short': "Это коротковато. Не могли бы вы рассказать о себе чуть больше?",
-        'values_ask': "Выберите 3 ключевые ценности, которые вы разделяете в работе:",
-        'values_error': "Пожалуйста, выберите ровно 3 ценности из кнопок.",
+        'values_intro': "Чтобы подобрать вам подходящих людей, нам нужно понять, что для вас важно в работе.\n\nВыберите 3 ключевые ценности из списка ниже.\n(Напишите их через запятую или нажимайте кнопки по одной.)",
+        'values_ask': "Перечислите ваши 3 ключевые ценности (например: Честность, Экспертиза, Скорость):",
+        'values_error': "Пожалуйста, выберите ровно 3 ценности. Напишите их через запятую или нажимайте кнопки по одной.",
         'role_ask': "Какова ваша основная роль?",
         'role_error': "Пожалуйста, выберите роль из кнопок.",
         'format_ask': "Какой формат общения вам удобен?",
@@ -243,6 +246,35 @@ Civis — это Республика Профессионалов — сооб�
         'no_profile': "У вас ещё нет профиля. Используйте /start, чтобы создать его!",
         'help': "📚 Civis Бот\n\n/start - Создать профиль\n/profile - Мой профиль\n/survey - Обновить профиль\n/status - Статус бота\n/cancel - Отменить текущую операцию\n/help - Помощь",
         'status': "🤖 Civis Бот\n\nПрофилей: {count}\nПрокси: {proxy}",
+        'values_list': "Честность, Экспертиза, Инициатива, Надёжность, Скорость, Эмпатия, Системность, Креативность, Открытость, Амбициозность",
+    }
+}
+
+# --- VALUE MAPPING ---
+VALUE_MAP = {
+    'en': {
+        'Honesty': 'Honesty',
+        'Expertise': 'Expertise',
+        'Initiative': 'Initiative',
+        'Reliability': 'Reliability',
+        'Speed': 'Speed',
+        'Empathy': 'Empathy',
+        'Systematic': 'Systematic',
+        'Creativity': 'Creativity',
+        'Openness': 'Openness',
+        'Ambition': 'Ambition',
+    },
+    'ru': {
+        'Честность': 'Honesty',
+        'Экспертиза': 'Expertise',
+        'Инициатива': 'Initiative',
+        'Надёжность': 'Reliability',
+        'Скорость': 'Speed',
+        'Эмпатия': 'Empathy',
+        'Системность': 'Systematic',
+        'Креативность': 'Creativity',
+        'Открытость': 'Openness',
+        'Амбициозность': 'Ambition',
     }
 }
 
@@ -252,6 +284,17 @@ def get_text(tg_id, key, **kwargs):
     lang = user.get('language', 'en') if user else 'en'
     text = TEXTS.get(lang, TEXTS['en']).get(key, TEXTS['en'][key])
     return text.format(**kwargs) if kwargs else text
+
+def get_value_list(lang):
+    """Get value list in user's language"""
+    return TEXTS.get(lang, TEXTS['en'])['values_list']
+
+def get_value_buttons(lang):
+    """Get value buttons for keyboard"""
+    if lang == 'ru':
+        return ["Честность", "Экспертиза", "Инициатива", "Надёжность", "Скорость", "Эмпатия", "Системность", "Креативность", "Открытость", "Амбициозность"]
+    else:
+        return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
 
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
@@ -297,25 +340,31 @@ def get_main_keyboard():
     )
     return keyboard
 
-def get_values_keyboard():
+def get_values_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    values = ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
+    values = get_value_buttons(lang)
     buttons = [KeyboardButton(v) for v in values]
     keyboard.add(*buttons)
     keyboard.add(KeyboardButton("/cancel"))
     return keyboard
 
-def get_roles_keyboard():
+def get_roles_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    roles = ["Executor", "Customer", "Coordinator", "Investor"]
+    if lang == 'ru':
+        roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор"]
+    else:
+        roles = ["Executor", "Customer", "Coordinator", "Investor"]
     buttons = [KeyboardButton(r) for r in roles]
     keyboard.add(*buttons)
     keyboard.add(KeyboardButton("/cancel"))
     return keyboard
 
-def get_formats_keyboard():
+def get_formats_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    formats = ["Text", "Voice", "Video", "Any"]
+    if lang == 'ru':
+        formats = ["Текст", "Голос", "Видео", "Любой"]
+    else:
+        formats = ["Text", "Voice", "Video", "Any"]
     buttons = [KeyboardButton(f) for f in formats]
     keyboard.add(*buttons)
     keyboard.add(KeyboardButton("/cancel"))
@@ -504,33 +553,71 @@ def handle_survey(message: Message):
             return
         data['about_text'] = text
         set_session(tg_id, 'survey_values', data)
+        
+        # Show values intro and keyboard
         bot.reply_to(
             message,
-            TEXTS[lang]['values_ask'],
-            reply_markup=get_values_keyboard()
+            TEXTS[lang]['values_intro'] + "\n\n" + TEXTS[lang]['values_ask'],
+            reply_markup=get_values_keyboard(lang)
         )
     
     elif state == 'survey_values':
-        valid_values = ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
-        selected = [v.strip() for v in text.split(',')]
-        selected = [v for v in selected if v in valid_values]
+        # Parse values - support both languages
+        value_map = VALUE_MAP.get(lang, VALUE_MAP['en'])
+        
+        # Split by comma or newline
+        selected = []
+        for part in text.split(','):
+            for v in part.strip().split('\n'):
+                v = v.strip()
+                if v:
+                    # Try to find in value map
+                    if v in value_map:
+                        selected.append(value_map[v])
+                    elif v in VALUE_MAP['en']:
+                        selected.append(v)
+                    elif v in VALUE_MAP['ru']:
+                        selected.append(VALUE_MAP['ru'][v])
+        
+        # Remove duplicates
+        selected = list(dict.fromkeys(selected))
         
         if len(selected) != 3:
-            bot.reply_to(message, TEXTS[lang]['values_error'])
+            # Show error with current selection
+            current = ', '.join(selected) if selected else 'none'
+            bot.reply_to(
+                message,
+                TEXTS[lang]['values_error'] + f"\n\nYou selected: {current}\n\nAvailable: {get_value_list(lang)}"
+            )
             return
         
-        data['user_values'] = ', '.join(selected)
+        # Store values in user's language
+        if lang == 'ru':
+            # Store Russian names
+            ru_values = [v for v in VALUE_MAP['ru'] if VALUE_MAP['ru'][v] in selected]
+            data['user_values'] = ', '.join(ru_values)
+        else:
+            data['user_values'] = ', '.join(selected)
+        
         set_session(tg_id, 'survey_role', data)
         bot.reply_to(
             message,
-            TEXTS[lang]['role_ask'],
-            reply_markup=get_roles_keyboard()
+            f"Great! ✅\n\n" + TEXTS[lang]['role_ask'],
+            reply_markup=get_roles_keyboard(lang)
         )
     
     elif state == 'survey_role':
-        valid_roles = ["Executor", "Customer", "Coordinator", "Investor"]
+        # Check role
+        if lang == 'ru':
+            valid_roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор"]
+        else:
+            valid_roles = ["Executor", "Customer", "Coordinator", "Investor"]
+        
         if text not in valid_roles:
-            bot.reply_to(message, TEXTS[lang]['role_error'])
+            bot.reply_to(
+                message,
+                f"Please select a role from the buttons: {', '.join(valid_roles)}"
+            )
             return
         
         data['role'] = text
@@ -538,13 +625,20 @@ def handle_survey(message: Message):
         bot.reply_to(
             message,
             TEXTS[lang]['format_ask'],
-            reply_markup=get_formats_keyboard()
+            reply_markup=get_formats_keyboard(lang)
         )
     
     elif state == 'survey_format':
-        valid_formats = ["Text", "Voice", "Video", "Any"]
+        if lang == 'ru':
+            valid_formats = ["Текст", "Голос", "Видео", "Любой"]
+        else:
+            valid_formats = ["Text", "Voice", "Video", "Any"]
+        
         if text not in valid_formats:
-            bot.reply_to(message, TEXTS[lang]['format_error'])
+            bot.reply_to(
+                message,
+                f"Please select a format from the buttons: {', '.join(valid_formats)}"
+            )
             return
         
         data['format'] = text
