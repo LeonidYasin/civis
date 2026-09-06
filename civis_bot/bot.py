@@ -9,10 +9,11 @@ import signal
 
 import requests
 from telebot import TeleBot
+from telebot.types import BotCommand
 
 from config import TOKEN, get_proxy_url
 from database import init_db
-from handlers.commands import register_handlers, set_bot
+from handlers import register_handlers, set_bot
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -47,6 +48,36 @@ else:
 # --- SET BOT FOR HANDLERS ---
 set_bot(bot)
 
+# --- SET COMMANDS MENU (left sidebar) ---
+def set_commands_menu():
+    """Set the bot commands menu (visible when typing /)"""
+    commands = [
+        BotCommand("start", "Create or view your profile"),
+        BotCommand("menu", "Show main menu"),
+        BotCommand("profile", "View your profile"),
+        BotCommand("embedding", "View your AI embedding profile"),
+        BotCommand("citizens", "List all citizens"),
+        BotCommand("search", "Search citizens"),
+        BotCommand("offer", "Publish an offer"),
+        BotCommand("request", "Publish a request"),
+        BotCommand("my_offers", "View your offers"),
+        BotCommand("my_requests", "View your requests"),
+        BotCommand("delete_offer", "Delete your offer by ID"),
+        BotCommand("delete_request", "Delete your request by ID"),
+        BotCommand("marketplace", "View marketplace"),
+        BotCommand("subscribe", "View subscription plans"),
+        BotCommand("match", "AI-powered matching"),
+        BotCommand("setkey", "Set OpenAI API key"),
+        BotCommand("language", "Change language"),
+        BotCommand("support", "Contact developer support"),
+        BotCommand("status", "Bot status"),
+        BotCommand("help", "Help"),
+        BotCommand("cancel", "Cancel current operation"),
+        BotCommand("done", "Finish value selection"),
+    ]
+    bot.set_my_commands(commands)
+    logger.info("Commands menu set")
+
 # --- REGISTER HANDLERS ---
 register_handlers()
 
@@ -54,6 +85,7 @@ register_handlers()
 if __name__ == "__main__":
     try:
         init_db()
+        set_commands_menu()
         
         logger.info("Checking connection to Telegram API...")
         me = bot.get_me()
