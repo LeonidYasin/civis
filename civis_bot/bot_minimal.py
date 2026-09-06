@@ -39,13 +39,11 @@ logger.info("Token loaded")
 # --- PROXY SETUP ---
 def get_proxy_url():
     """Get proxy URL from .env or environment"""
-    # First check .env
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
         logger.info(f"Proxy from .env: {proxy_url}")
         return proxy_url
     
-    # Then check system env
     http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
     https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
     
@@ -59,11 +57,21 @@ def get_proxy_url():
     logger.info("No proxy configured, using direct connection")
     return None
 
-# --- BOT INIT ---
-# We'll create bot inside main() with proxy
+# --- CREATE BOT INSIDE MAIN ---
+async def create_bot_with_proxy():
+    """Create bot with proxy if configured"""
+    proxy_url = get_proxy_url()
+    
+    if proxy_url:
+        from aiohttp_socks import ProxyConnector
+        connector = ProxyConnector.from_url(proxy_url)
+        aiohttp_session = aiohttp.ClientSession(connector=connector)
+        aiogram_session = AiohttpSession(session=aiohttp_session)
+        return Bot(token=TOKEN, session=aiogram_session)
+    else:
+        return Bot(token=TOKEN)
 
-# --- HANDLERS ---
-@dp.message(Command("start"))
+# --- HANDLERS (defined as functions) ---
 async def cmd_start(message: Message):
     """Handler for /start command"""
     logger.info(f"Received /start from {message.from_user.id}")
@@ -76,7 +84,6 @@ async def cmd_start(message: Message):
         "/info - bot information"
     )
 
-@dp.message(Command("ping"))
 async def cmd_ping(message: Message):
     """Check connection"""
     logger.info(f"Received /ping from {message.from_user.id}")
@@ -86,7 +93,6 @@ async def cmd_ping(message: Message):
     latency = (end_time - start_time).total_seconds() * 1000
     await message.answer(f"Latency: {latency:.0f} ms")
 
-@dp.message(Command("echo"))
 async def cmd_echo(message: Message):
     """Echo user text"""
     logger.info(f"Received /echo from {message.from_user.id}")
@@ -96,11 +102,11 @@ async def cmd_echo(message: Message):
     else:
         await message.answer("Please write something after /echo")
 
-@dp.message(Command("info"))
 async def cmd_info(message: Message):
     """Bot information"""
     logger.info(f"Received /info from {message.from_user.id}")
     try:
+        bot = message.bot
         me = await bot.me()
         await message.answer(
             f"Bot info:\n"
@@ -113,28 +119,12 @@ async def cmd_info(message: Message):
         logger.error(f"Error getting bot info: {e}")
         await message.answer(f"Error: {e}")
 
-@dp.message()
 async def handle_unknown(message: Message):
     """Unknown message handler"""
     logger.info(f"Unknown message from {message.from_user.id}: {message.text}")
     await message.answer(
         "Unknown command. Use /start for command list."
     )
-
-# --- CREATE BOT INSIDE MAIN ---
-async def create_bot_with_proxy():
-    """Create bot with proxy if configured"""
-    proxy_url = get_proxy_url()
-    
-    if proxy_url:
-        # Import here to avoid event loop issues
-        from aiohttp_socks import ProxyConnector
-        connector = ProxyConnector.from_url(proxy_url)
-        aiohttp_session = aiohttp.ClientSession(connector=connector)
-        aiogram_session = AiohttpSession(session=aiohttp_session)
-        return Bot(token=TOKEN, session=aiogram_session)
-    else:
-        return Bot(token=TOKEN)
 
 # --- MAIN ---
 async def main():
