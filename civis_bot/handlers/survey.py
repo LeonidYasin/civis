@@ -29,7 +29,7 @@ def set_bot(bot_instance):
 # --- SURVEY HANDLER ---
 
 def handle_survey(message: Message):
-    """Handle survey states"""
+    """Handle survey states and support messages"""
     if bot is None:
         logger.error("Bot not set in survey.py!")
         return
@@ -47,6 +47,29 @@ def handle_survey(message: Message):
         return
     
     lang = data.get('language', 'en')
+    
+    # --- SUPPORT MODE ---
+    if state == 'support':
+        # Forward message to developer (hardcoded chat ID for now)
+        # In production, this should be configurable
+        developer_chat_id = 521254540  # Your chat ID
+        try:
+            # Forward to developer
+            bot.send_message(
+                developer_chat_id,
+                f"📩 Support message from user {tg_id} (@{message.from_user.username}):\n\n{text}"
+            )
+            # Also send a copy to the user
+            bot.send_message(
+                tg_id,
+                get_text(tg_id, 'support_sent'),
+                reply_markup=get_main_keyboard(lang)
+            )
+            clear_session(tg_id)
+        except Exception as e:
+            logger.error(f"Support forward error: {e}")
+            bot.reply_to(message, get_text(tg_id, 'support_error'))
+        return
     
     # --- BACK BUTTON HANDLING ---
     if text == "/back" or text == "Назад" or text == "Back":
