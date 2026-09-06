@@ -1,29 +1,36 @@
 #!/usr/bin/env python3
 """
-Survey handlers for Civis bot.
-Handles the multi-step registration process.
+Survey state handlers for Civis bot.
 """
 
 import logging
 
-from telebot.types import Message, ReplyKeyboardRemove
+from telebot.types import Message
 
-from database import get_user, get_session, set_session, clear_session, save_user, create_subscription
+from database import get_user, save_user, get_session, set_session, clear_session, create_subscription
 from locales import TEXTS, VALUE_MAP
-from keyboards import get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard
+from keyboards import (
+    get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard
+)
 from utils import get_text
 
 logger = logging.getLogger(__name__)
 
-# Global bot reference
+# Global bot reference (set from commands)
 bot = None
 
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
 
+# --- SURVEY HANDLER ---
+
 def handle_survey(message: Message):
-    """Handle survey states - natural conversation"""
+    """Handle survey states"""
+    if bot is None:
+        logger.error("Bot not set in survey.py!")
+        return
+    
     tg_id = message.from_user.id
     text = message.text.strip()
     
@@ -222,7 +229,6 @@ def handle_survey(message: Message):
             bot.reply_to(message, "Error saving your profile. Please try again.")
     
     elif state == 'offer':
-        from database import save_offer
         save_offer(tg_id, text)
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
@@ -233,7 +239,6 @@ def handle_survey(message: Message):
         clear_session(tg_id)
     
     elif state == 'request':
-        from database import save_request
         save_request(tg_id, text)
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
