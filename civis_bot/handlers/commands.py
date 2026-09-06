@@ -69,6 +69,7 @@ def register_handlers():
     bot.message_handler(commands=['search'])(cmd_search)
     bot.message_handler(commands=['delete_offer'])(cmd_delete_offer)
     bot.message_handler(commands=['delete_request'])(cmd_delete_request)
+    bot.message_handler(commands=['support'])(cmd_support)
     
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
@@ -401,7 +402,6 @@ def cmd_subscribe(message: Message):
     remaining = get_matches_remaining(tg_id)
     remaining_text = str(remaining) if remaining != float('inf') else '∞'
     
-    # Use localized text
     text = f"""{get_text(tg_id, 'subscribe_title')}
 
 {get_text(tg_id, 'subscribe_current', plan=sub['plan'].upper())}
@@ -514,6 +514,18 @@ def cmd_search(message: Message):
         text += f"... and {len(results) - 20} more results."
     
     bot.reply_to(message, text)
+
+def cmd_support(message: Message):
+    """Contact developer"""
+    tg_id = message.from_user.id
+    user = get_user(tg_id)
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+        return
+    
+    lang = user.get('language', 'en')
+    set_session(tg_id, 'support', {'language': lang})
+    bot.reply_to(message, get_text(tg_id, 'support_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def get_user_by_username(username):
     conn = sqlite3.connect(DB_PATH)
