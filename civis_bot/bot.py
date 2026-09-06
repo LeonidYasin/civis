@@ -13,7 +13,7 @@ from telebot.types import BotCommand
 
 from config import TOKEN, get_proxy_url
 from database import init_db
-from handlers import set_bot, register_handlers
+from handlers import register_handlers, set_bot
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -53,6 +53,7 @@ def set_commands_menu():
     """Set the bot commands menu (visible when typing /)"""
     commands = [
         BotCommand("start", "Create or view your profile"),
+        BotCommand("menu", "Show main menu"),
         BotCommand("profile", "View your profile"),
         BotCommand("embedding", "View your AI embedding profile"),
         BotCommand("citizens", "List all citizens"),
@@ -61,19 +62,17 @@ def set_commands_menu():
         BotCommand("request", "Publish a request"),
         BotCommand("my_offers", "View your offers"),
         BotCommand("my_requests", "View your requests"),
-        BotCommand("offers", "View all offers"),
-        BotCommand("requests", "View all requests"),
         BotCommand("delete_offer", "Delete your offer by ID"),
         BotCommand("delete_request", "Delete your request by ID"),
         BotCommand("marketplace", "View marketplace"),
         BotCommand("subscribe", "View subscription plans"),
         BotCommand("match", "AI-powered matching"),
         BotCommand("setkey", "Set OpenAI API key"),
-        BotCommand("upload_dialog", "Upload dialog history file"),
-        BotCommand("my_dialogs", "List uploaded dialog files"),
-        BotCommand("process_dialogs", "Process dialog files"),
         BotCommand("language", "Change language"),
         BotCommand("support", "Contact developer support"),
+        BotCommand("upload_dialog", "Upload dialog history file"),
+        BotCommand("my_dialogs", "List uploaded dialog files"),
+        BotCommand("process_dialogs", "Process uploaded dialogs"),
         BotCommand("status", "Bot status"),
         BotCommand("help", "Help"),
         BotCommand("cancel", "Cancel current operation"),
