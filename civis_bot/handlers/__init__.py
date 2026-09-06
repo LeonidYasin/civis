@@ -8,12 +8,12 @@ import logging
 
 from telebot.types import Message
 
-# Import helpers first - get bot and set_bot
+# Import helpers first
 from .helpers import set_bot, bot, get_bot
 
 # Import command modules
 from .core import (
-    cmd_start, cmd_profile, cmd_embedding, cmd_citizens,
+    cmd_start, cmd_menu, cmd_profile, cmd_embedding, cmd_citizens,
     cmd_help, cmd_survey, cmd_status, cmd_cancel, cmd_done,
     cmd_language
 )
@@ -51,6 +51,7 @@ def register_handlers():
     
     # Core commands
     bot.message_handler(commands=['start'])(cmd_start)
+    bot.message_handler(commands=['menu'])(cmd_menu)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
     bot.message_handler(commands=['citizens'])(cmd_citizens)
