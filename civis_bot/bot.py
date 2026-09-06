@@ -189,9 +189,11 @@ async def main():
     # Создаём коннектор
     connector = get_proxy_connector()
     
-    # Создаём AiohttpSession с кастомным коннектором через kwargs
-    # В aiogram v3 AiohttpSession принимает любые kwargs для aiohttp.ClientSession
-    session = AiohttpSession(connector=connector)
+    # Создаём aiohttp.ClientSession с кастомным коннектором
+    client_session = aiohttp.ClientSession(connector=connector)
+    
+    # Передаём aiohttp.ClientSession в AiohttpSession
+    session = AiohttpSession(session=client_session)
     
     bot = Bot(token=TOKEN, session=session)
     
