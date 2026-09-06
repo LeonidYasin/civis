@@ -42,7 +42,6 @@ def handle_survey(message: Message):
     
     # --- SUPPORT MODE ---
     if state == 'support':
-        # Forward message to admin
         if ADMIN_CHAT_ID:
             try:
                 bot.send_message(
@@ -54,8 +53,8 @@ def handle_survey(message: Message):
                 logger.error(f"Support forward error: {e}")
                 bot.reply_to(message, get_text(tg_id, 'support_error'))
         else:
-            logger.info(f"Support message from {tg_id}: {text}")
-            bot.reply_to(message, get_text(tg_id, 'support_sent'))
+            logger.info(f"[SUPPORT] Message from {tg_id}: {text}")
+            bot.reply_to(message, "Thanks for your message! (Admin chat not configured, message logged.)")
         
         clear_session(tg_id)
         return
