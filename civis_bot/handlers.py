@@ -5,6 +5,7 @@ Handlers for Civis bot commands.
 
 import logging
 import json
+import sqlite3
 from datetime import datetime
 
 from telebot.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, BotCommand
@@ -16,7 +17,7 @@ from database import (
     save_offer, save_request, delete_offer, delete_request,
     get_subscription, create_subscription, update_subscription_plan,
     can_use_match, get_matches_remaining, increment_matches_used,
-    get_openai_key, save_openai_key
+    get_openai_key, save_openai_key, DB_PATH
 )
 from locales import TEXTS, VALUE_MAP
 from keyboards import (
@@ -311,9 +312,17 @@ def cmd_language(message: Message):
 def cmd_subscribe(message: Message):
     """Show subscription plans"""
     tg_id = message.from_user.id
+    
+    # Debug: check if user exists
     user = get_user(tg_id)
-    if not user or user.get('status') != 'completed':
-        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+    logger.info(f"cmd_subscribe: tg_id={tg_id}, user={user}")
+    
+    if not user:
+        bot.reply_to(message, "❌ You don't have a profile yet. Use /start to create one!")
+        return
+    
+    if user.get('status') != 'completed':
+        bot.reply_to(message, "❌ Your profile is not complete. Use /start to complete it!")
         return
     
     lang = user.get('language', 'en')
@@ -323,11 +332,12 @@ def cmd_subscribe(message: Message):
         sub = get_subscription(tg_id)
     
     remaining = get_matches_remaining(tg_id)
+    remaining_text = str(remaining) if remaining != float('inf') else '∞'
     
     text = f"""💳 **Subscription Plans**
 
 Current plan: {sub['plan'].upper()}
-Matches remaining: {remaining if remaining != float('inf') else '∞'}
+Matches remaining: {remaining_text}
 
 📌 **Free** — $0/month
   • 3 matches/month
@@ -356,6 +366,7 @@ def cmd_setkey(message: Message):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
+    # Check if key is provided
     parts = message.text.split()
     if len(parts) < 2:
         bot.reply_to(
@@ -382,6 +393,7 @@ def cmd_match(message: Message):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
+    # Check if user has OpenAI key
     openai_key = get_openai_key(tg_id)
     if not openai_key:
         bot.reply_to(
@@ -391,6 +403,7 @@ def cmd_match(message: Message):
         )
         return
     
+    # Check subscription
     if not can_use_match(tg_id):
         remaining = get_matches_remaining(tg_id)
         bot.reply_to(
@@ -401,13 +414,16 @@ def cmd_match(message: Message):
         )
         return
     
+    # Increment match count
     increment_matches_used(tg_id)
     
+    # Get all citizens
     citizens = get_all_citizens()
     if not citizens:
         bot.reply_to(message, "No citizens to match with yet. Come back later!")
         return
     
+    # Build prompt for OpenAI
     user_profile = f"""Name: {user.get('name', 'Unknown')}
 Role: {user.get('role', 'N/A')}
 Values: {user.get('user_values', 'N/A')}
@@ -415,13 +431,14 @@ About: {user.get('about_text', 'N/A')}"""
     
     citizens_list = []
     for username, name, role, values in citizens:
-        if tg_id != get_user_by_username(username):
+        if tg_id != get_user_by_username(username):  # Skip self
             citizens_list.append(f"@{username} - {name} ({role})")
     
     if not citizens_list:
         bot.reply_to(message, "No other citizens to match with yet. Share the bot with friends!")
         return
     
+    # This is a placeholder — we'll implement OpenAI call in the next step
     bot.reply_to(
         message,
         f"🔍 AI Matching in progress...\n\n"
@@ -548,9 +565,13 @@ def handle_survey(message: Message):
             bot.reply_to(message, f"Please choose a value from the buttons.\n\nCurrent selection: {len(selected)}/3")
     
     elif state == 'survey_role':
+        roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
+        # Check if text is in the list (with language support)
+        valid_roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
         if lang == 'ru':
             ru_roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
             if text in ru_roles:
+                # Map to English for storage
                 role_map = {
                     "Исполнитель": "Executor",
                     "Заказчик": "Customer",
@@ -567,7 +588,6 @@ def handle_survey(message: Message):
                 )
                 return
         else:
-            valid_roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
             if text not in valid_roles:
                 bot.reply_to(
                     message,
@@ -581,31 +601,15 @@ def handle_survey(message: Message):
     
     elif state == 'survey_format':
         if lang == 'ru':
-            ru_formats = ["Текст", "Голос", "Видео", "Любой"]
-            if text in ru_formats:
-                # Store English value
-                format_map = {
-                    "Текст": "Text",
-                    "Голос": "Voice",
-                    "Видео": "Video",
-                    "Любой": "Any"
-                }
-                data['format'] = format_map[text]
-            else:
-                bot.reply_to(
-                    message,
-                    f"Пожалуйста, выберите формат из кнопок: {', '.join(ru_formats)}"
-                )
-                return
+            formats = ["Текст", "Голос", "Видео", "Любой"]
         else:
-            valid_formats = ["Text", "Voice", "Video", "Any"]
-            if text not in valid_formats:
-                bot.reply_to(
-                    message,
-                    f"Please select a format from the buttons: {', '.join(valid_formats)}"
-                )
-                return
-            data['format'] = text
+            formats = ["Text", "Voice", "Video", "Any"]
+        
+        if text not in formats:
+            bot.reply_to(message, f"Please select a format from the buttons: {', '.join(formats)}")
+            return
+        
+        data['format'] = text
         
         username = message.from_user.username or "unknown"
         
@@ -625,6 +629,7 @@ def handle_survey(message: Message):
             
             clear_session(tg_id)
             
+            # Create subscription for user
             create_subscription(tg_id)
             
             bot.reply_to(
