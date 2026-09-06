@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Основной бот Civis с поддержкой прокси через переменные окружения.
-Автоматически использует HTTP_PROXY/HTTPS_PROXY если они заданы.
+Main Civis bot with proxy support and error handling.
+No emoji for Windows console compatibility.
 """
 
 import asyncio
@@ -19,7 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
 
-# --- НАСТРОЙКА ЛОГГИРОВАНИЯ ---
+# --- LOGGING SETUP (no emoji) ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,25 +29,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- ЗАГРУЗКА ПЕРЕМЕННЫХ ---
+# --- LOAD ENV ---
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    logger.error("❌ BOT_TOKEN не найден в .env файле!")
+    logger.error("ERROR: BOT_TOKEN not found in .env file!")
+    logger.error("Create .env file with: BOT_TOKEN=your_token")
     sys.exit(1)
 
-# --- ПРОВЕРКА ПРОКСИ ---
+# --- PROXY CHECK ---
 http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
 https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
 if http_proxy or https_proxy:
-    logger.info(f"🔌 Используется прокси: {https_proxy or http_proxy}")
+    logger.info(f"Using proxy: {https_proxy or http_proxy}")
 else:
-    logger.info("🔌 Прокси не настроен")
+    logger.info("No proxy configured, direct connection")
 
-# --- ПОДКЛЮЧЕНИЕ К БАЗЕ (SQLite) ---
+# --- DATABASE (SQLite) ---
 DB_PATH = Path(__file__).parent / "civis_data.db"
 
 def init_db():
+    """Initialize database"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
@@ -65,13 +67,14 @@ def init_db():
         """)
         conn.commit()
         conn.close()
-        logger.info("✅ База данных инициализирована")
+        logger.info("Database initialized")
         return True
     except Exception as e:
-        logger.error(f"❌ Ошибка инициализации БД: {e}")
+        logger.error(f"Database init error: {e}")
         return False
 
 def save_profile(tg_user_id, tg_username, text, values, role, format):
+    """Save profile to database"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
@@ -83,101 +86,112 @@ def save_profile(tg_user_id, tg_username, text, values, role, format):
         conn.close()
         return True
     except Exception as e:
-        logger.error(f"❌ Ошибка сохранения: {e}")
+        logger.error(f"Profile save error: {e}")
         return False
 
-# --- ИНИЦИАЛИЗАЦИЯ ---
+# --- INIT ---
 if not init_db():
+    logger.error("Failed to initialize database. Bot will not start.")
     sys.exit(1)
 
-# --- СОСТОЯНИЯ АНКЕТЫ ---
+# --- FORM STATES ---
 class Form(StatesGroup):
     text = State()
     values = State()
     role = State()
     format = State()
 
-# --- КНОПКИ ---
+# --- KEYBOARDS ---
 values_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Честность"), KeyboardButton(text="Экспертиза")],
-        [KeyboardButton(text="Инициатива"), KeyboardButton(text="Надёжность")],
-        [KeyboardButton(text="Скорость"), KeyboardButton(text="Эмпатия")],
-        [KeyboardButton(text="Системность"), KeyboardButton(text="Креативность")],
-        [KeyboardButton(text="Открытость"), KeyboardButton(text="Амбициозность")]
+        [KeyboardButton(text="Honesty"), KeyboardButton(text="Expertise")],
+        [KeyboardButton(text="Initiative"), KeyboardButton(text="Reliability")],
+        [KeyboardButton(text="Speed"), KeyboardButton(text="Empathy")],
+        [KeyboardButton(text="Systematic"), KeyboardButton(text="Creativity")],
+        [KeyboardButton(text="Openness"), KeyboardButton(text="Ambition")]
     ],
     resize_keyboard=True
 )
 
 role_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Исполнитель")],
-        [KeyboardButton(text="Заказчик")],
-        [KeyboardButton(text="Координатор")],
-        [KeyboardButton(text="Инвестор")]
+        [KeyboardButton(text="Executor")],
+        [KeyboardButton(text="Customer")],
+        [KeyboardButton(text="Coordinator")],
+        [KeyboardButton(text="Investor")]
     ],
     resize_keyboard=True
 )
 
 format_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="Текст"), KeyboardButton(text="Голос")],
-        [KeyboardButton(text="Видео"), KeyboardButton(text="Любой")]
+        [KeyboardButton(text="Text"), KeyboardButton(text="Voice")],
+        [KeyboardButton(text="Video"), KeyboardButton(text="Any")]
     ],
     resize_keyboard=True
 )
 
-# --- ИНИЦИАЛИЗАЦИЯ БОТА ---
+# --- BOT INIT ---
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- ХЕНДЛЕРЫ ---
+# --- HANDLERS ---
 @dp.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
-    logger.info(f"📨 /start от {message.from_user.id}")
+    """Handler for /start command"""
+    logger.info(f"/start from {message.from_user.id}")
     await state.set_state(Form.text)
     await message.answer(
-        "👋 Привет! Ты вступаешь в Civis — республику профессионалов.\n\n"
-        "📝 Расскажи о себе и своей профессиональной цели.\n"
-        "Минимум 300 символов. Это поможет нам понять твой профиль.",
+        "Hello! You are joining Civis - the republic of professionals.\n\n"
+        "Tell about yourself and your professional goals.\n"
+        "Minimum 300 characters. This will help us understand your profile.",
         reply_markup=ReplyKeyboardRemove()
     )
 
 @dp.message(Form.text)
 async def process_text(message: types.Message, state: FSMContext):
+    """Process text from form"""
+    logger.info(f"Text received from {message.from_user.id}, length: {len(message.text)}")
     if len(message.text) < 300:
-        await message.answer("⚠️ Минимум 300 символов.")
+        await message.answer("Please write at least 300 characters. This is important for analysis.")
         return
     await state.update_data(text=message.text)
     await state.set_state(Form.values)
     await message.answer(
-        "🎯 Выбери 3 ключевые ценности:",
+        "Select 3 key values that you share in your work:",
         reply_markup=values_keyboard
     )
 
 @dp.message(Form.values)
 async def process_values(message: types.Message, state: FSMContext):
+    """Process values selection"""
+    logger.info(f"Values from {message.from_user.id}: {message.text}")
     await state.update_data(values=message.text)
     await state.set_state(Form.role)
     await message.answer(
-        "💼 Твоя роль?",
+        "What is your main role?",
         reply_markup=role_keyboard
     )
 
 @dp.message(Form.role)
 async def process_role(message: types.Message, state: FSMContext):
+    """Process role selection"""
+    logger.info(f"Role from {message.from_user.id}: {message.text}")
     await state.update_data(role=message.text)
     await state.set_state(Form.format)
     await message.answer(
-        "📱 Формат общения?",
+        "Which communication format is convenient for you?",
         reply_markup=format_keyboard
     )
 
 @dp.message(Form.format)
 async def process_format(message: types.Message, state: FSMContext):
+    """Process format selection"""
+    logger.info(f"Format from {message.from_user.id}: {message.text}")
     await state.update_data(format=message.text)
     data = await state.get_data()
 
+    # Save to database
     success = save_profile(
         tg_user_id=str(message.from_user.id),
         tg_username=message.from_user.username or "unknown",
@@ -189,31 +203,67 @@ async def process_format(message: types.Message, state: FSMContext):
 
     if success:
         await message.answer(
-            "✅ Ты в Civis!\n\n"
-            "Твой профиль сохранён.",
+            "You are in Civis!\n\n"
+            "Your profile is saved. Soon we will start matching you with projects and teams.\n"
+            "Stay tuned.",
             reply_markup=ReplyKeyboardRemove()
         )
+        logger.info(f"Profile saved for {message.from_user.id}")
     else:
-        await message.answer("⚠️ Ошибка сохранения.", reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            "Profile save error. Try again later or use /start.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        logger.error(f"Profile save failed for {message.from_user.id}")
 
     await state.clear()
 
-# --- ЗАПУСК ---
+# --- MAIN ---
 async def main():
-    logger.info("🚀 Запуск бота Civis...")
+    """Main function"""
+    logger.info("Starting Civis main bot...")
+    logger.info(f"Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+    
     try:
+        # Check connection
+        logger.info("Checking connection to Telegram API...")
         me = await bot.me()
-        logger.info(f"✅ Бот подключен: @{me.username}")
+        logger.info(f"Connected: @{me.username} ({me.full_name})")
+        
+        # Start polling
+        logger.info("Starting polling...")
         await dp.start_polling(bot)
+        
     except Exception as e:
-        logger.error(f"❌ Ошибка: {e}")
+        logger.error(f"Critical error: {e}")
+        
+        # Diagnostics
+        logger.error("Diagnostics:")
+        logger.error(f"  - Python: {sys.version}")
+        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+        
+        # DNS check
+        try:
+            import socket
+            socket.gethostbyname("api.telegram.org")
+            logger.error("  DNS: api.telegram.org resolves")
+        except Exception as dns_err:
+            logger.error(f"  DNS error: {dns_err}")
+        
+        # Proxy check
+        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+        if http_proxy:
+            logger.error(f"  Proxy configured: {http_proxy}")
+        else:
+            logger.error("  Proxy not configured")
+        
         sys.exit(1)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("⏹️ Остановлен")
+        logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"❌ Критическая ошибка: {e}")
+        logger.error(f"Unhandled error: {e}")
         sys.exit(1)
