@@ -42,11 +42,7 @@ def handle_survey(message: Message):
     
     # --- SUPPORT MODE ---
     if state == 'support':
-        # Determine where to send support messages
         admin_target = ADMIN_CHAT_ID
-        
-        # If ADMIN_CHAT_ID is a group (negative), use it directly
-        # If it's a user ID (positive), send to that user
         if admin_target:
             try:
                 bot.send_message(
@@ -65,7 +61,6 @@ def handle_survey(message: Message):
                 logger.error(f"Support forward error: {e}")
                 bot.reply_to(message, get_text(tg_id, 'support_error'))
         else:
-            # If no admin configured, just log it and acknowledge
             logger.info(f"[SUPPORT] Message from {tg_id}: {text}")
             bot.reply_to(
                 message,
@@ -74,7 +69,54 @@ def handle_survey(message: Message):
                     get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
                 )
             )
-        
+        clear_session(tg_id)
+        return
+    
+    # --- TAXI OFFER ---
+    if state == 'offer_taxi':
+        save_offer(tg_id, text, 'taxi')
+        lang = get_user(tg_id).get('language', 'en')
+        bot.reply_to(
+            message,
+            f"✅ Taxi offer published!\n\n{text}\n\nUse /taxi to view all taxi listings.",
+            reply_markup=get_main_keyboard(lang)
+        )
+        clear_session(tg_id)
+        return
+    
+    # --- TAXI REQUEST ---
+    if state == 'request_taxi':
+        save_request(tg_id, text, 'taxi')
+        lang = get_user(tg_id).get('language', 'en')
+        bot.reply_to(
+            message,
+            f"✅ Taxi request published!\n\n{text}\n\nUse /taxi to view all taxi listings.",
+            reply_markup=get_main_keyboard(lang)
+        )
+        clear_session(tg_id)
+        return
+    
+    # --- DELIVERY OFFER ---
+    if state == 'offer_delivery':
+        save_offer(tg_id, text, 'delivery')
+        lang = get_user(tg_id).get('language', 'en')
+        bot.reply_to(
+            message,
+            f"✅ Delivery offer published!\n\n{text}\n\nUse /delivery to view all delivery listings.",
+            reply_markup=get_main_keyboard(lang)
+        )
+        clear_session(tg_id)
+        return
+    
+    # --- DELIVERY REQUEST ---
+    if state == 'request_delivery':
+        save_request(tg_id, text, 'delivery')
+        lang = get_user(tg_id).get('language', 'en')
+        bot.reply_to(
+            message,
+            f"✅ Delivery request published!\n\n{text}\n\nUse /delivery to view all delivery listings.",
+            reply_markup=get_main_keyboard(lang)
+        )
         clear_session(tg_id)
         return
     
