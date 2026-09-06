@@ -13,7 +13,7 @@ from .helpers import set_bot, bot, get_bot
 
 # Import command modules
 from .core import (
-    cmd_start, cmd_menu, cmd_profile, cmd_embedding, cmd_citizens,
+    cmd_start, cmd_menu, cmd_reload, cmd_profile, cmd_embedding, cmd_citizens,
     cmd_help, cmd_survey, cmd_status, cmd_cancel, cmd_done,
     cmd_language
 )
@@ -53,6 +53,7 @@ def register_handlers():
     # Core commands
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['menu'])(cmd_menu)
+    bot.message_handler(commands=['reload'])(cmd_reload)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
     bot.message_handler(commands=['citizens'])(cmd_citizens)
@@ -95,10 +96,10 @@ def register_handlers():
     bot.message_handler(commands=['support'])(cmd_support)
     bot.message_handler(commands=['search'])(cmd_search)
     
-    # Language selection handler - MUST be registered BEFORE survey handler
+    # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages - MUST be LAST)
+    # Survey state handler (catch-all for text messages)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
