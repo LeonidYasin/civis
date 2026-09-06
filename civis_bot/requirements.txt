@@ -2,3 +2,7 @@ aiogram
 python-dotenv
 aiohttp
 aiohttp-socks
+
+# For synchronous bot with HTTP proxy
+telebot
+requests
