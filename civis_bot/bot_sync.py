@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Civis MVP Bot - Natural conversation flow, no hard 300-char limit.
+Civis MVP Bot - Natural conversation flow with language selection.
 """
 
 import logging
@@ -73,6 +73,7 @@ def init_db():
             user_values TEXT,
             role TEXT,
             format TEXT,
+            language TEXT DEFAULT 'en',
             status TEXT DEFAULT 'registered',
             created_at TEXT,
             updated_at TEXT
@@ -100,7 +101,7 @@ def get_user(tg_id):
     row = cur.fetchone()
     conn.close()
     if row:
-        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'about_text', 'user_values', 'role', 'format', 'status', 'created_at', 'updated_at']
+        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'about_text', 'user_values', 'role', 'format', 'language', 'status', 'created_at', 'updated_at']
         return dict(zip(columns, row))
     return None
 
@@ -166,6 +167,75 @@ def clear_session(tg_id):
     conn.commit()
     conn.close()
 
+# --- TRANSLATIONS ---
+TEXTS = {
+    'en': {
+        'welcome': """🏛️ Welcome to Civis!
+
+Civis is a Republic of Professionals — a community where people connect based on trust, values, and shared goals.
+
+We use AI to understand who you are and match you with the right people, projects, and opportunities.
+
+No resumes. No cold calls. Just real connections.
+
+Let's create your profile!""",
+        'language_set': "🌍 Language set to English.",
+        'choose_language': "🌍 Choose your language:",
+        'name_ask': "What is your name?",
+        'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
+        'about_short': "That's a bit short. Could you tell me a little more about yourself?",
+        'values_ask': "Select 3 key values that you share in your work:",
+        'values_error': "Please select exactly 3 values from the buttons.",
+        'role_ask': "What is your main role?",
+        'role_error': "Please select a role from the buttons.",
+        'format_ask': "Which communication format is convenient for you?",
+        'format_error': "Please select a format from the buttons.",
+        'profile_complete': "🎉 Congratulations! Your profile is complete.\nYou are now a citizen of Civis!",
+        'cancel': "✅ Cancelled.",
+        'unknown': "Use /start to create your profile or /help for commands.",
+        'profile': "👤 Profile:",
+        'no_profile': "You don't have a profile yet. Use /start to create one!",
+        'help': "📚 Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
+        'status': "🤖 Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
+    },
+    'ru': {
+        'welcome': """🏛️ Добро пожаловать в Civis!
+
+Civis — это Республика Профессионалов — сообщество, где люди соединяются на основе доверия, ценностей и общих целей.
+
+Мы используем ИИ, чтобы понять, кто вы, и подобрать вам подходящих людей, проекты и возможности.
+
+Без резюме. Без холодных звонков. Только настоящие связи.
+
+Давайте создадим ваш профиль!""",
+        'language_set': "🌍 Язык установлен: Русский.",
+        'choose_language': "🌍 Выберите язык:",
+        'name_ask': "Как вас зовут?",
+        'about_ask': "Расскажите немного о себе и своих профессиональных целях.\n(Достаточно пары предложений.)",
+        'about_short': "Это коротковато. Не могли бы вы рассказать о себе чуть больше?",
+        'values_ask': "Выберите 3 ключевые ценности, которые вы разделяете в работе:",
+        'values_error': "Пожалуйста, выберите ровно 3 ценности из кнопок.",
+        'role_ask': "Какова ваша основная роль?",
+        'role_error': "Пожалуйста, выберите роль из кнопок.",
+        'format_ask': "Какой формат общения вам удобен?",
+        'format_error': "Пожалуйста, выберите формат из кнопок.",
+        'profile_complete': "🎉 Поздравляем! Ваш профиль заполнен.\nТеперь вы гражданин Civis!",
+        'cancel': "✅ Отменено.",
+        'unknown': "Используйте /start для создания профиля или /help для помощи.",
+        'profile': "👤 Профиль:",
+        'no_profile': "У вас ещё нет профиля. Используйте /start, чтобы создать его!",
+        'help': "📚 Civis Бот\n\n/start - Создать профиль\n/profile - Мой профиль\n/survey - Обновить профиль\n/status - Статус бота\n/cancel - Отменить текущую операцию\n/help - Помощь",
+        'status': "🤖 Civis Бот\n\nПрофилей: {count}\nПрокси: {proxy}",
+    }
+}
+
+def get_text(tg_id, key, **kwargs):
+    """Get localized text for user"""
+    user = get_user(tg_id)
+    lang = user.get('language', 'en') if user else 'en'
+    text = TEXTS.get(lang, TEXTS['en']).get(key, TEXTS['en'][key])
+    return text.format(**kwargs) if kwargs else text
+
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
 if proxy_url:
@@ -193,6 +263,14 @@ def set_commands():
     logger.info("Commands menu set")
 
 # --- KEYBOARDS ---
+def get_language_keyboard():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    keyboard.add(
+        KeyboardButton("🇬🇧 English"),
+        KeyboardButton("🇷🇺 Русский")
+    )
+    return keyboard
+
 def get_main_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     keyboard.add(
@@ -229,13 +307,14 @@ def get_formats_keyboard():
 # --- COMMAND HANDLERS ---
 @bot.message_handler(commands=['start'])
 def cmd_start(message: Message):
-    """Start command"""
+    """Start command - show welcome and language selection"""
     tg_id = message.from_user.id
     username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
     
     user = get_user(tg_id)
     if user and user.get('status') == 'completed':
+        lang = user.get('language', 'en')
         bot.reply_to(
             message,
             f"Welcome back, {user.get('name', 'friend')}! 🎉\n\n"
@@ -244,14 +323,12 @@ def cmd_start(message: Message):
         )
         return
     
-    set_session(tg_id, 'survey_name', {})
+    # Show language selection
+    set_session(tg_id, 'language_select', {})
     bot.reply_to(
         message,
-        "Welcome to Civis! 🏛️\n\n"
-        "Let's create your profile. Just answer a few questions.\n"
-        "Type /cancel anytime to exit.\n\n"
-        "What is your name?",
-        reply_markup=ReplyKeyboardRemove()
+        TEXTS['en']['choose_language'] + "\n\n" + TEXTS['ru']['choose_language'],
+        reply_markup=get_language_keyboard()
     )
 
 @bot.message_handler(commands=['profile'])
@@ -264,13 +341,12 @@ def cmd_profile(message: Message):
     if not user or user.get('status') != 'completed':
         bot.reply_to(
             message,
-            "You don't have a profile yet.\n"
-            "Use /start to create one!"
+            get_text(tg_id, 'no_profile')
         )
         return
     
     profile_text = (
-        f"👤 Profile:\n\n"
+        f"{get_text(tg_id, 'profile')}\n\n"
         f"Name: {user.get('name', 'N/A')}\n"
         f"Telegram: @{user.get('username', 'N/A')}\n"
         f"Role: {user.get('role', 'N/A')}\n"
@@ -283,17 +359,8 @@ def cmd_profile(message: Message):
 @bot.message_handler(commands=['help'])
 def cmd_help(message: Message):
     """Help command"""
-    bot.reply_to(
-        message,
-        "📚 Civis Bot\n\n"
-        "/start - Create your profile\n"
-        "/profile - View your profile\n"
-        "/survey - Update your profile\n"
-        "/status - Bot status\n"
-        "/cancel - Cancel current operation\n"
-        "/help - Show this message\n\n"
-        "💡 Use the buttons for quick actions!"
-    )
+    tg_id = message.from_user.id
+    bot.reply_to(message, get_text(tg_id, 'help'))
 
 @bot.message_handler(commands=['survey'])
 def cmd_survey(message: Message):
@@ -301,11 +368,12 @@ def cmd_survey(message: Message):
     tg_id = message.from_user.id
     logger.info(f"Received /survey from {tg_id}")
     
-    set_session(tg_id, 'survey_name', {})
+    user = get_user(tg_id)
+    lang = user.get('language', 'en') if user else 'en'
+    set_session(tg_id, 'survey_name', {'language': lang})
     bot.reply_to(
         message,
-        "📝 Let's update your profile.\n\n"
-        "What is your name?",
+        get_text(tg_id, 'name_ask'),
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -325,10 +393,7 @@ def cmd_status(message: Message):
         
         bot.reply_to(
             message,
-            f"🤖 Civis Bot\n\n"
-            f"Bot: @{me.username}\n"
-            f"Profiles: {count}\n"
-            f"Proxy: {proxy_url or 'None'}"
+            get_text(tg_id, 'status', count=count, proxy=proxy_url or 'None')
         )
     except Exception as e:
         logger.error(f"Status error: {e}")
@@ -343,9 +408,46 @@ def cmd_cancel(message: Message):
     clear_session(tg_id)
     bot.reply_to(
         message,
-        "✅ Cancelled.\n"
-        "Use /start to begin again.",
+        get_text(tg_id, 'cancel'),
         reply_markup=get_main_keyboard()
+    )
+
+# --- LANGUAGE SELECTION ---
+@bot.message_handler(func=lambda message: message.text in ["🇬🇧 English", "🇷🇺 Русский"])
+def handle_language_selection(message: Message):
+    """Handle language selection"""
+    tg_id = message.from_user.id
+    text = message.text
+    
+    if "English" in text:
+        lang = 'en'
+    else:
+        lang = 'ru'
+    
+    # Save language to user
+    user = get_user(tg_id)
+    if user:
+        save_user(tg_id, user.get('username', 'unknown'), language=lang)
+    else:
+        save_user(tg_id, message.from_user.username or "unknown", language=lang)
+    
+    # Clear language selection session if exists
+    state, _ = get_session(tg_id)
+    if state == 'language_select':
+        clear_session(tg_id)
+    
+    # Show welcome message in selected language
+    bot.reply_to(
+        message,
+        TEXTS[lang]['language_set'] + "\n\n" + TEXTS[lang]['welcome'],
+        reply_markup=ReplyKeyboardRemove()
+    )
+    
+    # Start survey
+    set_session(tg_id, 'survey_name', {'language': lang})
+    bot.send_message(
+        tg_id,
+        TEXTS[lang]['name_ask']
     )
 
 # --- SURVEY STATE HANDLERS ---
@@ -359,13 +461,15 @@ def handle_survey(message: Message):
         return
     
     state, data = get_session(tg_id)
-    if not state:
+    if not state or state == 'language_select':
         bot.reply_to(
             message,
-            "Use /start to create your profile or /help for commands.",
+            get_text(tg_id, 'unknown'),
             reply_markup=get_main_keyboard()
         )
         return
+    
+    lang = data.get('language', 'en')
     
     if state == 'survey_name':
         if len(text) < 2:
@@ -375,26 +479,18 @@ def handle_survey(message: Message):
         set_session(tg_id, 'survey_about', data)
         bot.reply_to(
             message,
-            f"Nice to meet you, {text}! 👋\n\n"
-            "Tell me a bit about yourself and your professional goals.\n"
-            "(Just a few sentences is fine.)"
+            f"Nice to meet you, {text}! 👋\n\n" + TEXTS[lang]['about_ask']
         )
     
     elif state == 'survey_about':
-        # No hard limit - accept any text, encourage more if too short
         if len(text) < 20:
-            bot.reply_to(
-                message,
-                "That's a bit short. Could you tell me a little more about yourself?\n"
-                "(Or just type /skip if you prefer)"
-            )
+            bot.reply_to(message, TEXTS[lang]['about_short'])
             return
         data['about_text'] = text
         set_session(tg_id, 'survey_values', data)
         bot.reply_to(
             message,
-            "Great! 📝\n\n"
-            "Now, select 3 key values that you share in your work.",
+            TEXTS[lang]['values_ask'],
             reply_markup=get_values_keyboard()
         )
     
@@ -404,47 +500,35 @@ def handle_survey(message: Message):
         selected = [v for v in selected if v in valid_values]
         
         if len(selected) != 3:
-            bot.reply_to(
-                message,
-                "Please select exactly 3 values from the buttons.\n"
-                "You can type them separated by commas, or click the buttons."
-            )
+            bot.reply_to(message, TEXTS[lang]['values_error'])
             return
         
         data['user_values'] = ', '.join(selected)
         set_session(tg_id, 'survey_role', data)
         bot.reply_to(
             message,
-            "Excellent! 🎯\n\n"
-            "What is your main role?",
+            TEXTS[lang]['role_ask'],
             reply_markup=get_roles_keyboard()
         )
     
     elif state == 'survey_role':
         valid_roles = ["Executor", "Customer", "Coordinator", "Investor"]
         if text not in valid_roles:
-            bot.reply_to(
-                message,
-                f"Please select a role from the buttons: {', '.join(valid_roles)}"
-            )
+            bot.reply_to(message, TEXTS[lang]['role_error'])
             return
         
         data['role'] = text
         set_session(tg_id, 'survey_format', data)
         bot.reply_to(
             message,
-            "Almost done! 📱\n\n"
-            "Which communication format is convenient for you?",
+            TEXTS[lang]['format_ask'],
             reply_markup=get_formats_keyboard()
         )
     
     elif state == 'survey_format':
         valid_formats = ["Text", "Voice", "Video", "Any"]
         if text not in valid_formats:
-            bot.reply_to(
-                message,
-                f"Please select a format from the buttons: {', '.join(valid_formats)}"
-            )
+            bot.reply_to(message, TEXTS[lang]['format_error'])
             return
         
         data['format'] = text
@@ -462,6 +546,7 @@ def handle_survey(message: Message):
                 user_values=data.get('user_values', ''),
                 role=data.get('role', ''),
                 format=data.get('format', ''),
+                language=data.get('language', 'en'),
                 status='completed'
             )
             
@@ -469,9 +554,7 @@ def handle_survey(message: Message):
             
             bot.reply_to(
                 message,
-                f"🎉 Congratulations, {data['name']}!\n\n"
-                "Your profile is complete.\n"
-                "You are now a citizen of Civis! 🏛️\n\n"
+                f"🎉 {data['name']}!\n\n" + TEXTS[lang]['profile_complete'] + "\n\n"
                 f"Role: {data['role']}\n"
                 f"Values: {data['user_values']}\n"
                 f"Format: {data['format']}\n\n"
@@ -483,10 +566,7 @@ def handle_survey(message: Message):
             
         except Exception as e:
             logger.error(f"Error saving profile: {e}")
-            bot.reply_to(
-                message,
-                "❌ Error saving your profile. Please try again or contact support."
-            )
+            bot.reply_to(message, "❌ Error saving your profile. Please try again.")
 
 # --- MAIN ---
 if __name__ == "__main__":
