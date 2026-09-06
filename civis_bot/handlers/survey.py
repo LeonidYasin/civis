@@ -15,21 +15,25 @@ from keyboards import (
 from utils import get_text
 from config import ADMIN_CHAT_ID
 
+from .helpers import get_bot
+
 logger = logging.getLogger(__name__)
 
-# Global bot reference (set from commands)
-bot = None
-
-def set_bot(bot_instance):
-    global bot
-    bot = bot_instance
+def get_bot_safe():
+    """Get bot instance safely"""
+    bot = get_bot()
+    if bot is None:
+        logger.error("Bot not set in survey.py!")
+        raise RuntimeError("Bot not set")
+    return bot
 
 # --- SURVEY HANDLER ---
 
 def handle_survey(message: Message):
     """Handle survey states"""
-    if bot is None:
-        logger.error("Bot not set in survey.py!")
+    try:
+        bot = get_bot_safe()
+    except RuntimeError:
         return
     
     tg_id = message.from_user.id
@@ -43,6 +47,7 @@ def handle_survey(message: Message):
     # --- SUPPORT MODE ---
     if state == 'support':
         admin_target = ADMIN_CHAT_ID
+        
         if admin_target:
             try:
                 bot.send_message(
@@ -69,54 +74,7 @@ def handle_survey(message: Message):
                     get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
                 )
             )
-        clear_session(tg_id)
-        return
-    
-    # --- TAXI OFFER ---
-    if state == 'offer_taxi':
-        save_offer(tg_id, text, 'taxi')
-        lang = get_user(tg_id).get('language', 'en')
-        bot.reply_to(
-            message,
-            f"✅ Taxi offer published!\n\n{text}\n\nUse /taxi to view all taxi listings.",
-            reply_markup=get_main_keyboard(lang)
-        )
-        clear_session(tg_id)
-        return
-    
-    # --- TAXI REQUEST ---
-    if state == 'request_taxi':
-        save_request(tg_id, text, 'taxi')
-        lang = get_user(tg_id).get('language', 'en')
-        bot.reply_to(
-            message,
-            f"✅ Taxi request published!\n\n{text}\n\nUse /taxi to view all taxi listings.",
-            reply_markup=get_main_keyboard(lang)
-        )
-        clear_session(tg_id)
-        return
-    
-    # --- DELIVERY OFFER ---
-    if state == 'offer_delivery':
-        save_offer(tg_id, text, 'delivery')
-        lang = get_user(tg_id).get('language', 'en')
-        bot.reply_to(
-            message,
-            f"✅ Delivery offer published!\n\n{text}\n\nUse /delivery to view all delivery listings.",
-            reply_markup=get_main_keyboard(lang)
-        )
-        clear_session(tg_id)
-        return
-    
-    # --- DELIVERY REQUEST ---
-    if state == 'request_delivery':
-        save_request(tg_id, text, 'delivery')
-        lang = get_user(tg_id).get('language', 'en')
-        bot.reply_to(
-            message,
-            f"✅ Delivery request published!\n\n{text}\n\nUse /delivery to view all delivery listings.",
-            reply_markup=get_main_keyboard(lang)
-        )
+        
         clear_session(tg_id)
         return
     
