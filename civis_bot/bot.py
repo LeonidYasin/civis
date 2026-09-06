@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sqlite3
 import os
+import socket
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +12,32 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
+
+# --- ПОДДЕРЖКА ПРОКСИ ---
+import aiohttp
+from aiogram.client.session.aiohttp import AiohttpSession
+
+def get_proxy_connector():
+    """Создаёт прокси-коннектор из системных переменных или .env"""
+    # Сначала проверяем .env
+    proxy_url = os.getenv("PROXY_URL")
+    if proxy_url:
+        from aiohttp_socks import ProxyConnector
+        return ProxyConnector.from_url(proxy_url)
+    
+    # Проверяем системные переменные (HTTP_PROXY/HTTPS_PROXY)
+    http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+    https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+    
+    if https_proxy:
+        from aiohttp_socks import ProxyConnector
+        return ProxyConnector.from_url(https_proxy)
+    elif http_proxy:
+        from aiohttp_socks import ProxyConnector
+        return ProxyConnector.from_url(http_proxy)
+    
+    # Если прокси нет — используем обычный IPv4
+    return aiohttp.TCPConnector(family=socket.AF_INET)
 
 # --- ЗАГРУЗКА ПЕРЕМЕННЫХ ---
 load_dotenv()
@@ -89,8 +116,10 @@ format_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ИНИЦИАЛИЗАЦИЯ БОТА ---
-bot = Bot(token=TOKEN)
+# --- ИНИЦИАЛИЗАЦИЯ БОТА С ПРОКСИ ---
+connector = get_proxy_connector()
+session = AiohttpSession(connector=connector)
+bot = Bot(token=TOKEN, session=session)
 dp = Dispatcher()
 
 # --- ХЕНДЛЕРЫ ---
