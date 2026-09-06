@@ -27,32 +27,30 @@ def get_bot_safe():
 # --- LANGUAGE SELECTION ---
 
 def handle_language_selection(message: Message):
-    """Handle language selection"""
+    """Handle language selection from keyboard buttons"""
     try:
         bot = get_bot_safe()
     except RuntimeError:
         return
     
     tg_id = message.from_user.id
-    text = message.text.strip()
+    text = message.text
     
-    # Check if text is exactly "English" or "Русский" (case-insensitive, trimmed)
-    if text.lower() == "english":
-        lang = 'en'
-    elif text.lower() == "русский" or text == "Русский":
-        lang = 'ru'
-    else:
-        # Not a language selection message
+    if text not in ["English", "Русский"]:
         return
     
-    logger.info(f"Language selected: {lang} for user {tg_id}")
+    lang = 'en' if text == "English" else 'ru'
     
+    logger.info(f"Language selection: {tg_id} chose {lang}")
+    
+    # Save language to user
     user = get_user(tg_id)
     if user:
         save_user(tg_id, user.get('username', 'unknown'), language=lang)
     else:
         save_user(tg_id, message.from_user.username or "unknown", language=lang)
     
+    # Clear language selection session
     state, _ = get_session(tg_id)
     if state == 'language_select':
         clear_session(tg_id)
