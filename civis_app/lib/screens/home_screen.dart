@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/profile_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,24 +9,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _name = '';
-  bool _isLoading = true;
+  String _userName = 'Гражданин';
+  final int _civisScore = 85; // В будущем будет вычисляться динамически
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadUserName();
   }
 
-  Future<void> _loadProfile() async {
-    final profiles = await ProfileDatabase.instance.getAllProfiles();
-    if (profiles.isNotEmpty) {
-      setState(() {
-        _name = profiles.last.name;
-        _isLoading = false;
-      });
-    } else {
-      setState(() => _isLoading = false);
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    // В будущем можно загружать имя из базы
+    // Пока оставим заглушку
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('has_profile');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/welcome');
     }
   }
 
@@ -38,196 +40,149 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // TODO: выход
-            },
+            onPressed: _logout,
+            tooltip: 'Выйти',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Карточка пользователя
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Карточка пользователя
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Colors.blue,
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.blue,
-                            child: Icon(
-                              Icons.person,
-                              size: 30,
-                              color: Colors.white,
+                          Text(
+                            'Привет, $_userName!',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Привет, $_name!',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Text(
-                                  'Гражданин Civis',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Гражданин Civis',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
                             ),
                           ),
+                          const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
-                              vertical: 6,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(20),
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Text(
-                              'Score: 85',
+                            child: Text(
+                              'Civis Score: $_civisScore',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue,
+                                color: Colors.green.shade800,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Подходит тебе',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 120,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildMatchCard('Алексей', 'Разработчик', '92%'),
-                        const SizedBox(width: 12),
-                        _buildMatchCard('Мария', 'Дизайнер', '87%'),
-                        const SizedBox(width: 12),
-                        _buildMatchCard('Иван', 'Продуктолог', '78%'),
-                        const SizedBox(width: 12),
-                        _buildMatchCard('Елена', 'Маркетолог', '95%'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Вакансии и проекты',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ListView(
-                      children: [
-                        _buildProjectCard('Разработка MVP CIVIS', 'Ищем Flutter-разработчика'),
-                        _buildProjectCard('Дизайн системы', 'Ищем UI/UX-дизайнера'),
-                        _buildProjectCard('Стратегия сообщества', 'Ищем Community Lead'),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Лента'),
-          BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Проекты'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Профиль'),
-        ],
-        currentIndex: 0,
-        onTap: (index) {
-          // TODO: навигация
-        },
-      ),
-    );
-  }
-
-  Widget _buildMatchCard(String name, String role, String match) {
-    return Card(
-      child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.blue.shade100,
+            const SizedBox(height: 24),
+            const Text(
+              'Подходит тебе',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Горизонтальный скролл карточек
+            SizedBox(
+              height: 160,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: 5,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Container(
+                      width: 140,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircleAvatar(
+                            radius: 24,
+                            backgroundColor: Colors.blue,
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Человек ${index + 1}',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Совместимость ${80 + index * 3}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Spacer(),
+            Center(
               child: Text(
-                name[0],
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              role,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                match,
+                'Версия 1.0.0',
                 style: TextStyle(
+                  color: Colors.grey.shade400,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade700,
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildProjectCard(String title, String subtitle) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const Icon(Icons.folder_open, color: Colors.blue),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          // TODO: детали проекта
-        },
       ),
     );
   }
