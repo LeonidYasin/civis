@@ -20,7 +20,8 @@ from .core import (
 from .marketplace import (
     cmd_offer, cmd_request, cmd_my_offers, cmd_my_requests,
     cmd_delete_offer, cmd_delete_request, cmd_marketplace,
-    cmd_offers, cmd_requests
+    cmd_offers, cmd_requests,
+    cmd_offer_real_estate, cmd_offer_taxi, cmd_offer_delivery
 )
 from .dialogs import (
     cmd_upload_dialog, cmd_my_dialogs, cmd_delete_dialog,
@@ -64,6 +65,9 @@ def register_handlers():
     
     # Marketplace commands
     bot.message_handler(commands=['offer'])(cmd_offer)
+    bot.message_handler(commands=['offer_real_estate'])(cmd_offer_real_estate)
+    bot.message_handler(commands=['offer_taxi'])(cmd_offer_taxi)
+    bot.message_handler(commands=['offer_delivery'])(cmd_offer_delivery)
     bot.message_handler(commands=['request'])(cmd_request)
     bot.message_handler(commands=['my_offers'])(cmd_my_offers)
     bot.message_handler(commands=['my_requests'])(cmd_my_requests)
