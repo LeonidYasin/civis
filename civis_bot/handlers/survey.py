@@ -42,19 +42,38 @@ def handle_survey(message: Message):
     
     # --- SUPPORT MODE ---
     if state == 'support':
-        if ADMIN_CHAT_ID:
+        # Determine where to send support messages
+        admin_target = ADMIN_CHAT_ID
+        
+        # If ADMIN_CHAT_ID is a group (negative), use it directly
+        # If it's a user ID (positive), send to that user
+        if admin_target:
             try:
                 bot.send_message(
-                    ADMIN_CHAT_ID,
+                    admin_target,
                     f"📩 Support message from user {tg_id} (@{message.from_user.username or 'unknown'}):\n\n{text}"
                 )
-                bot.reply_to(message, get_text(tg_id, 'support_sent'), reply_markup=get_main_keyboard(get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'))
+                bot.reply_to(
+                    message,
+                    get_text(tg_id, 'support_sent'),
+                    reply_markup=get_main_keyboard(
+                        get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
+                    )
+                )
+                logger.info(f"Support message from {tg_id} forwarded to {admin_target}")
             except Exception as e:
                 logger.error(f"Support forward error: {e}")
                 bot.reply_to(message, get_text(tg_id, 'support_error'))
         else:
+            # If no admin configured, just log it and acknowledge
             logger.info(f"[SUPPORT] Message from {tg_id}: {text}")
-            bot.reply_to(message, "Thanks for your message! (Admin chat not configured, message logged.)")
+            bot.reply_to(
+                message,
+                "Thanks for your message! (Admin chat not configured, message logged.)",
+                reply_markup=get_main_keyboard(
+                    get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
+                )
+            )
         
         clear_session(tg_id)
         return
