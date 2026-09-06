@@ -11,7 +11,7 @@ import sqlite3
 from pathlib import Path
 
 from database import get_user
-from locales import TEXTS, get_value_buttons, get_roles, get_formats
+from locales import get_value_buttons, get_roles, get_formats
 
 logger = logging.getLogger(__name__)
 
@@ -20,33 +20,9 @@ DB_PATH = Path(__file__).parent / "civis_data.db"
 def get_text(tg_id, key, **kwargs):
     user = get_user(tg_id)
     lang = user.get('language', 'en') if user else 'en'
+    from locales import TEXTS
     text = TEXTS.get(lang, TEXTS['en']).get(key, TEXTS['en'][key])
     return text.format(**kwargs) if kwargs else text
-
-# Re-export from locales
-def get_value_buttons(lang):
-    return get_value_buttons(lang)
-
-def get_roles(lang):
-    return get_roles(lang)
-
-def get_formats(lang):
-    return get_formats(lang)
-
-def get_embedding_profile(tg_id):
-    user = get_user(tg_id)
-    if not user:
-        return None
-    
-    profile = {
-        'name': user.get('name', ''),
-        'role': user.get('role', ''),
-        'values': user.get('user_values', ''),
-        'format': user.get('format', ''),
-        'about': user.get('about_text', ''),
-        'embedding_version': '1.0'
-    }
-    return json.dumps(profile, indent=2)
 
 def get_profile_text(user):
     """Convert user dict to text for embedding"""
@@ -55,8 +31,10 @@ Role: {user.get('role', '')}
 Values: {user.get('user_values', '')}
 About: {user.get('about_text', '')}"""
 
-def get_embedding(text, openai_key):
-    """Generate embedding for text using OpenAI"""
+def get_embedding_openai(text, openai_key):
+    """Generate embedding using OpenAI API"""
+    if not openai_key:
+        return None
     try:
         headers = {
             "Authorization": f"Bearer {openai_key}",
@@ -75,31 +53,75 @@ def get_embedding(text, openai_key):
         )
         
         if response.status_code != 200:
-            logger.error(f"Embedding API error: {response.text}")
+            logger.error(f"OpenAI embedding error: {response.text}")
             return None
         
         data = response.json()
         return data.get('data', [{}])[0].get('embedding')
         
     except Exception as e:
-        logger.error(f"Error generating embedding: {e}")
+        logger.error(f"OpenAI embedding error: {e}")
         return None
 
-def get_cached_embedding(tg_id, openai_key):
-    """Get cached embedding or generate new one"""
+def get_embedding_local(text):
+    """Generate embedding using local sentence-transformers model"""
+    try:
+        from sentence_transformers import SentenceTransformer
+        
+        # Cache model globally to avoid reloading
+        if not hasattr(get_embedding_local, 'model'):
+            logger.info("Loading local embedding model (all-MiniLM-L6-v2)...")
+            get_embedding_local.model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Local model loaded successfully")
+        
+        embedding = get_embedding_local.model.encode(text)
+        return embedding.tolist()
+        
+    except ImportError:
+        logger.warning("sentence-transformers not installed. Install: pip install sentence-transformers")
+        return None
+    except Exception as e:
+        logger.error(f"Local embedding error: {e}")
+        return None
+
+def get_embedding(text, openai_key=None, use_local_fallback=True):
+    """Get embedding with fallback to local model"""
+    # Try OpenAI first
+    if openai_key:
+        embedding = get_embedding_openai(text, openai_key)
+        if embedding:
+            return embedding
+    
+    # Fallback to local model
+    if use_local_fallback:
+        return get_embedding_local(text)
+    
+    return None
+
+def get_cached_embedding(tg_id, openai_key=None):
+    """Get cached embedding or generate new one with fallback"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
+    # Create embeddings table if not exists
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS embeddings (
+            tg_id INTEGER PRIMARY KEY,
+            embedding TEXT,
+            provider TEXT,
+            updated_at TEXT
+        )
+    """)
+    
     # Check if embedding exists and is fresh (less than 7 days old)
     cur.execute(
-        "SELECT embedding, updated_at FROM embeddings WHERE tg_id = ?",
+        "SELECT embedding, provider, updated_at FROM embeddings WHERE tg_id = ?",
         (tg_id,)
     )
     row = cur.fetchone()
     
     if row:
-        embedding_json, updated_at = row
-        # If less than 7 days old, use cached
+        embedding_json, provider, updated_at = row
         if updated_at:
             try:
                 updated = datetime.fromisoformat(updated_at)
@@ -117,23 +139,19 @@ def get_cached_embedding(tg_id, openai_key):
         return None
     
     text = get_profile_text(user)
-    embedding = get_embedding(text, openai_key)
+    embedding = get_embedding(text, openai_key, use_local_fallback=True)
     
     if embedding:
+        # Determine provider
+        provider = 'openai' if openai_key and embedding else 'local'
+        
         # Save to cache
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS embeddings (
-                tg_id INTEGER PRIMARY KEY,
-                embedding TEXT,
-                updated_at TEXT
-            )
-        """)
-        cur.execute("""
-            INSERT OR REPLACE INTO embeddings (tg_id, embedding, updated_at)
-            VALUES (?, ?, ?)
-        """, (tg_id, json.dumps(embedding), datetime.now().isoformat()))
+            INSERT OR REPLACE INTO embeddings (tg_id, embedding, provider, updated_at)
+            VALUES (?, ?, ?, ?)
+        """, (tg_id, json.dumps(embedding), provider, datetime.now().isoformat()))
         conn.commit()
         conn.close()
     
@@ -153,8 +171,8 @@ def cosine_similarity(a, b):
     
     return dot_product / (norm_a * norm_b)
 
-def find_matches(tg_id, openai_key, limit=5):
-    """Find matching citizens using embeddings"""
+def find_matches(tg_id, openai_key=None, limit=5):
+    """Find matching citizens using embeddings with fallback"""
     # Get current user's embedding
     my_embedding = get_cached_embedding(tg_id, openai_key)
     if not my_embedding:
@@ -185,8 +203,8 @@ def find_matches(tg_id, openai_key, limit=5):
         score = cosine_similarity(my_embedding, citizen_embedding)
         score_percent = int(score * 100)
         
-        # Only show matches above 20% (lower threshold for more results)
-        if score_percent >= 20:
+        # Only show matches above 15% threshold
+        if score_percent >= 15:
             matches.append({
                 'tg_id': citizen_tg_id,
                 'username': username or 'unknown',
@@ -228,3 +246,28 @@ def generate_match_explanation(user, match):
         parts.append("Good semantic match based on profile similarity")
     
     return " • ".join(parts)
+
+# Re-export from locales
+def get_value_buttons(lang):
+    return get_value_buttons(lang)
+
+def get_roles(lang):
+    return get_roles(lang)
+
+def get_formats(lang):
+    return get_formats(lang)
+
+def get_embedding_profile(tg_id):
+    user = get_user(tg_id)
+    if not user:
+        return None
+    
+    profile = {
+        'name': user.get('name', ''),
+        'role': user.get('role', ''),
+        'values': user.get('user_values', ''),
+        'format': user.get('format', ''),
+        'about': user.get('about_text', ''),
+        'embedding_version': '1.0'
+    }
+    return json.dumps(profile, indent=2)
