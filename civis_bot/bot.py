@@ -12,7 +12,7 @@ import threading
 
 import requests
 from telebot import TeleBot
-from telebot.types import BotCommand, CallbackQuery
+from telebot.types import BotCommand, CallbackQuery, Message
 
 from config import TOKEN, get_proxy_url
 from database import init_db
@@ -113,13 +113,42 @@ def handle_callback(call: CallbackQuery):
     # Get the command
     cmd = command_map[data]
     
-    # Create a fake message to simulate command
+    # Create a proper Message-like object with all required attributes
     class FakeMessage:
         def __init__(self, text, from_user, chat):
             self.text = text
             self.from_user = from_user
             self.chat = chat
             self.content_type = 'text'
+            self.message_id = 999999  # dummy message_id
+            self.reply_to_message = None
+            self.date = int(time.time())
+            self.entities = None
+            self.caption = None
+            self.document = None
+            self.photo = None
+            self.sticker = None
+            self.video = None
+            self.audio = None
+            self.voice = None
+            self.location = None
+            self.contact = None
+            self.poll = None
+            self.dice = None
+            self.game = None
+            self.pinned_message = None
+            self.invoice = None
+            self.successful_payment = None
+            self.passport_data = None
+            self.forward_from = None
+            self.forward_from_chat = None
+            self.forward_date = None
+            self.forward_sender_name = None
+            self.edit_date = None
+            self.media_group_id = None
+            self.author_signature = None
+            self.forward_from_message_id = None
+            self.connected_website = None
     
     fake_msg = FakeMessage(
         text=cmd,
