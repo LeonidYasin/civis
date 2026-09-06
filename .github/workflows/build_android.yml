@@ -2,14 +2,17 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'civis_app/**'
   workflow_dispatch:
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./civis_app
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +22,9 @@ jobs:
           flutter-version: '3.22.0'
 
       - name: Install dependencies
-        working-directory: ./civis_app
         run: flutter pub get
 
       - name: Build APK
-        working-directory: ./civis_app
         run: flutter build apk --release
 
       - name: Upload APK
