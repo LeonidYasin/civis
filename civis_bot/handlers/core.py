@@ -63,54 +63,54 @@ def cmd_menu(message: Message):
     
     lang = user.get('language', 'en')
     
-    # Full command list
+    # Full command list - clean text without emojis in command list
     text = "📋 **Civis Bot — Full Menu**\n\n"
     text += "**Profile & Account**\n"
-    text += "`/start` — Create or view your profile\n"
-    text += "`/profile` — View your profile\n"
-    text += "`/survey` — Update your profile\n"
-    text += "`/embedding` — View AI embedding profile\n\n"
+    text += "/start — Create or view your profile\n"
+    text += "/profile — View your profile\n"
+    text += "/survey — Update your profile\n"
+    text += "/embedding — View AI embedding profile\n\n"
     
     text += "**Marketplace**\n"
-    text += "`/offer` — Publish an offer (with category)\n"
-    text += "`/offer_real_estate` — Quick real estate offer\n"
-    text += "`/offer_taxi` — Quick taxi offer\n"
-    text += "`/offer_delivery` — Quick delivery offer\n"
-    text += "`/request` — Publish a request\n"
-    text += "`/my_offers` — View your offers\n"
-    text += "`/my_requests` — View your requests\n"
-    text += "`/delete_offer <id>` — Delete your offer\n"
-    text += "`/delete_request <id>` — Delete your request\n"
-    text += "`/marketplace` — View marketplace\n"
-    text += "`/offers` — View all offers\n"
-    text += "`/requests` — View all requests\n\n"
+    text += "/offer — Publish an offer (with category)\n"
+    text += "/offer_real_estate — Quick real estate offer\n"
+    text += "/offer_taxi — Quick taxi offer\n"
+    text += "/offer_delivery — Quick delivery offer\n"
+    text += "/request — Publish a request\n"
+    text += "/my_offers — View your offers\n"
+    text += "/my_requests — View your requests\n"
+    text += "/delete_offer <id> — Delete your offer\n"
+    text += "/delete_request <id> — Delete your request\n"
+    text += "/marketplace — View marketplace\n"
+    text += "/offers — View all offers\n"
+    text += "/requests — View all requests\n\n"
     
     text += "**People & Search**\n"
-    text += "`/citizens` — List all citizens\n"
-    text += "`/search <text>` — Search citizens\n"
-    text += "`/match` — AI-powered matching\n\n"
+    text += "/citizens — List all citizens\n"
+    text += "/search <text> — Search citizens\n"
+    text += "/match — AI-powered matching\n\n"
     
     text += "**Subscriptions & AI**\n"
-    text += "`/subscribe` — View subscription plans\n"
-    text += "`/setkey <key>` — Set OpenAI API key\n"
-    text += "`/upload_dialog` — Upload dialog history\n"
-    text += "`/my_dialogs` — List uploaded dialogs\n"
-    text += "`/process_dialogs` — Process dialogs\n\n"
+    text += "/subscribe — View subscription plans\n"
+    text += "/setkey <key> — Set OpenAI API key\n"
+    text += "/upload_dialog — Upload dialog history\n"
+    text += "/my_dialogs — List uploaded dialogs\n"
+    text += "/process_dialogs — Process dialogs\n\n"
     
     text += "**Settings & Help**\n"
-    text += "`/language` — Change language\n"
-    text += "`/support` — Contact developer\n"
-    text += "`/status` — Bot status\n"
-    text += "`/help` — Help\n"
-    text += "`/cancel` — Cancel current operation\n"
-    text += "`/done` — Finish value selection\n"
+    text += "/language — Change language\n"
+    text += "/support — Contact developer\n"
+    text += "/status — Bot status\n"
+    text += "/help — Help\n"
+    text += "/cancel — Cancel current operation\n"
+    text += "/done — Finish value selection\n"
     
-    # Use inline keyboard for interactive menu
+    # Use inline keyboard for interactive menu (without emojis in buttons)
     bot.reply_to(
         message,
         text,
         parse_mode='Markdown',
-        reply_markup=get_inline_main_keyboard(lang)
+        reply_markup=get_inline_main_keyboard(lang, with_icons=False)
     )
 
 def cmd_reload(message: Message):
