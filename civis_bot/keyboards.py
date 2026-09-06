@@ -54,6 +54,10 @@ def get_main_keyboard(lang='en'):
         KeyboardButton("/search"),
         KeyboardButton("/help")
     )
+    # Row 8
+    keyboard.row(
+        KeyboardButton("/support")
+    )
     
     return keyboard
 
