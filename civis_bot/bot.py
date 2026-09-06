@@ -6,6 +6,7 @@ Civis Bot - Entry point
 import logging
 import sys
 import signal
+import time
 
 import requests
 from telebot import TeleBot
@@ -25,9 +26,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Global flag for shutdown
+shutting_down = False
+
 # --- SIGNAL HANDLER ---
 def signal_handler(sig, frame):
-    logger.info("Stopping bot...")
+    global shutting_down
+    if shutting_down:
+        # Second Ctrl+C - force exit
+        logger.info("⚠️ Force exit...")
+        sys.exit(0)
+    
+    shutting_down = True
+    logger.info("\n" + "="*50)
+    logger.info("🛑 Shutting down bot...")
+    logger.info("   Please wait a moment...")
+    logger.info("   Press Ctrl+C again to force exit.")
+    logger.info("="*50)
+    
+    # Stop polling gracefully
+    try:
+        logger.info("⏳ Stopping polling...")
+        bot.stop_polling()
+        logger.info("✅ Polling stopped.")
+    except Exception as e:
+        logger.warning(f"⚠️ Error during shutdown: {e}")
+    
+    # Give a moment for cleanup
+    for i in range(5, 0, -1):
+        logger.info(f"⏳ Exiting in {i}...")
+        time.sleep(1)
+    
+    logger.info("👋 Bot stopped.")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -40,10 +70,10 @@ if proxy_url:
     session.proxies = {'http': proxy_url, 'https': proxy_url}
     bot = TeleBot(token=TOKEN, threaded=False)
     bot.session = session
-    logger.info(f"Bot created with proxy: {proxy_url}")
+    logger.info(f"✅ Bot created with proxy: {proxy_url}")
 else:
     bot = TeleBot(token=TOKEN, threaded=False)
-    logger.info("Bot created without proxy")
+    logger.info("✅ Bot created without proxy")
 
 # --- SET BOT FOR HANDLERS ---
 set_bot(bot)
@@ -79,7 +109,7 @@ def set_commands_menu():
         BotCommand("done", "Finish value selection"),
     ]
     bot.set_my_commands(commands)
-    logger.info("Commands menu set")
+    logger.info("📋 Commands menu set")
 
 # --- REGISTER HANDLERS ---
 register_handlers()
@@ -87,18 +117,26 @@ register_handlers()
 # --- MAIN ---
 if __name__ == "__main__":
     try:
+        logger.info("🚀 Starting Civis Bot...")
+        
         init_db()
+        logger.info("💾 Database initialized")
+        
         set_commands_menu()
         
-        logger.info("Checking connection to Telegram API...")
+        logger.info("🔌 Checking connection to Telegram API...")
         me = bot.get_me()
-        logger.info(f"Connected: @{me.username} ({me.full_name})")
+        logger.info(f"✅ Connected: @{me.username} ({me.full_name})")
         
-        logger.info("Starting polling... (Press Ctrl+C to stop)")
+        logger.info("▶️ Starting polling... (Press Ctrl+C to stop)")
+        logger.info("-" * 50)
         bot.infinity_polling()
         
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user (Ctrl+C)")
+        logger.info("\n🛑 Bot stopped by user (Ctrl+C)")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Critical error: {e}")
+        logger.error(f"❌ Critical error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
