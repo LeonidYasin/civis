@@ -8,6 +8,7 @@ import sys
 import signal
 import time
 import os
+import threading
 
 import requests
 from telebot import TeleBot
@@ -41,28 +42,36 @@ def signal_handler(sig, frame):
     global shutting_down
     if shutting_down:
         logger.info("Force exit...")
-        sys.exit(0)
+        # Force exit immediately on second Ctrl+C
+        os._exit(0)
     
     shutting_down = True
     logger.info("="*50)
     logger.info("Shutting down bot...")
-    logger.info("Please wait a moment...")
-    logger.info("Press Ctrl+C again to force exit.")
+    logger.info("Press Ctrl+C again to force exit immediately.")
     logger.info("="*50)
     
-    try:
-        logger.info("Stopping polling...")
-        bot.stop_polling()
-        logger.info("Polling stopped.")
-    except Exception as e:
-        logger.warning(f"Error during shutdown: {e}")
-    
-    for i in range(3, 0, -1):
-        logger.info(f"Exiting in {i}...")
+    # Try to stop polling gracefully in background
+    def stop_polling_thread():
+        try:
+            logger.info("Stopping polling...")
+            bot.stop_polling()
+            logger.info("Polling stopped.")
+        except Exception as e:
+            logger.warning(f"Error during shutdown: {e}")
+        
+        # Wait a bit then exit if not already
         time.sleep(1)
+        if not shutting_down:
+            return
+        logger.info("Bot stopped.")
+        os._exit(0)
     
-    logger.info("Bot stopped.")
-    sys.exit(0)
+    # Run stop in background thread so main thread can respond to second Ctrl+C
+    thread = threading.Thread(target=stop_polling_thread, daemon=True)
+    thread.start()
+    
+    # If shutdown takes too long, second Ctrl+C will force exit via os._exit
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
