@@ -192,7 +192,7 @@ async def main():
     # Создаём aiohttp.ClientSession с кастомным коннектором
     client_session = aiohttp.ClientSession(connector=connector)
     
-    # Передаём aiohttp.ClientSession в AiohttpSession
+    # Передаём aiohttp.ClientSession в AiohttpSession через параметр session
     session = AiohttpSession(session=client_session)
     
     bot = Bot(token=TOKEN, session=session)
