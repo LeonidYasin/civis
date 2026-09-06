@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Minimal bot for connection testing with proxy support from .env
+Minimal bot for connection testing.
+Uses standard Bot without custom session - proxy via env vars.
 """
 
 import asyncio
@@ -13,10 +14,6 @@ from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
-
-# Proxy support
-import aiohttp
-from aiogram.client.session.aiohttp import AiohttpSession
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -36,59 +33,28 @@ if not TOKEN:
     sys.exit(1)
 logger.info("Token loaded")
 
-# --- PROXY SETUP ---
-def get_proxy_url():
-    """Get proxy URL from .env or environment"""
-    proxy_url = os.getenv("PROXY_URL")
-    if proxy_url:
-        logger.info(f"Proxy from .env: {proxy_url}")
-        return proxy_url
-    
-    http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
-    https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
-    
-    if https_proxy:
-        logger.info(f"Proxy from HTTPS_PROXY: {https_proxy}")
-        return https_proxy
-    elif http_proxy:
-        logger.info(f"Proxy from HTTP_PROXY: {http_proxy}")
-        return http_proxy
-    
+# --- PROXY CHECK (from env vars) ---
+http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+if http_proxy or https_proxy:
+    logger.info(f"Proxy from env: {https_proxy or http_proxy}")
+else:
     logger.info("No proxy configured, using direct connection")
-    return None
 
-# --- CREATE BOT INSIDE MAIN ---
-async def create_bot_with_proxy():
-    """Create bot with proxy if configured"""
-    proxy_url = get_proxy_url()
-    
-    if proxy_url:
-        from aiohttp_socks import ProxyConnector
-        connector = ProxyConnector.from_url(proxy_url)
-        # Create aiohttp session with connector
-        aiohttp_session = aiohttp.ClientSession(connector=connector)
-        # Create aiogram session from aiohttp session
-        aiogram_session = AiohttpSession(session=aiohttp_session)
-        # Create bot with session
-        return Bot(token=TOKEN, session=aiogram_session)
-    else:
-        return Bot(token=TOKEN)
+# --- BOT INIT (standard, no custom session) ---
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
 # --- HANDLERS ---
 async def cmd_start(message: Message):
-    """Handler for /start command"""
     logger.info(f"Received /start from {message.from_user.id}")
     await message.answer(
         "Hello! I am a minimal test bot for Civis.\n"
         "If you see this - connection to Telegram API works!\n\n"
-        "Available commands:\n"
-        "/ping - check connection\n"
-        "/echo <text> - echo your message\n"
-        "/info - bot information"
+        "Commands: /ping, /echo <text>, /info"
     )
 
 async def cmd_ping(message: Message):
-    """Check connection"""
     logger.info(f"Received /ping from {message.from_user.id}")
     start_time = datetime.now()
     await message.answer("Pong!")
@@ -97,7 +63,6 @@ async def cmd_ping(message: Message):
     await message.answer(f"Latency: {latency:.0f} ms")
 
 async def cmd_echo(message: Message):
-    """Echo user text"""
     logger.info(f"Received /echo from {message.from_user.id}")
     text = message.text.replace("/echo", "", 1).strip()
     if text:
@@ -106,10 +71,8 @@ async def cmd_echo(message: Message):
         await message.answer("Please write something after /echo")
 
 async def cmd_info(message: Message):
-    """Bot information"""
     logger.info(f"Received /info from {message.from_user.id}")
     try:
-        bot = message.bot
         me = await bot.me()
         await message.answer(
             f"Bot info:\n"
@@ -119,24 +82,16 @@ async def cmd_info(message: Message):
             f"Token: {TOKEN[:10]}...{TOKEN[-5:]}"
         )
     except Exception as e:
-        logger.error(f"Error getting bot info: {e}")
+        logger.error(f"Error: {e}")
         await message.answer(f"Error: {e}")
 
 async def handle_unknown(message: Message):
-    """Unknown message handler"""
-    logger.info(f"Unknown message from {message.from_user.id}: {message.text}")
-    await message.answer(
-        "Unknown command. Use /start for command list."
-    )
+    logger.info(f"Unknown message from {message.from_user.id}")
+    await message.answer("Unknown command. Use /start for commands.")
 
 # --- MAIN ---
 async def main():
-    """Main function"""
     logger.info("Starting minimal bot...")
-    
-    # Create bot inside event loop
-    bot = await create_bot_with_proxy()
-    dp = Dispatcher()
     
     # Register handlers
     dp.message.register(cmd_start, Command("start"))
@@ -146,15 +101,10 @@ async def main():
     dp.message.register(handle_unknown)
     
     try:
-        # Check connection to Telegram
         logger.info("Checking connection to Telegram API...")
         me = await bot.me()
-        logger.info(f"Connected to Telegram API!")
-        logger.info(f"Bot name: {me.full_name}")
-        logger.info(f"Username: @{me.username}")
-        logger.info(f"ID: {me.id}")
+        logger.info(f"Connected! Bot: @{me.username} ({me.full_name}), ID: {me.id}")
         
-        # Start polling
         logger.info("Starting polling...")
         await dp.start_polling(bot)
         
@@ -164,10 +114,10 @@ async def main():
         
         # Diagnostics
         logger.error("Diagnostics:")
-        logger.error(f"  - Python version: {sys.version}")
+        logger.error(f"  - Python: {sys.version}")
         logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
         
-        # DNS check
+        # DNS
         try:
             import socket
             socket.gethostbyname("api.telegram.org")
@@ -175,12 +125,12 @@ async def main():
         except Exception as dns_err:
             logger.error(f"  DNS error: {dns_err}")
         
-        # Proxy check
-        proxy_url = get_proxy_url()
-        if proxy_url:
-            logger.error(f"  Proxy configured: {proxy_url}")
+        # Proxy
+        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+        if http_proxy:
+            logger.error(f"  Proxy from env: {http_proxy}")
         else:
-            logger.error("  Proxy not configured")
+            logger.error("  Proxy not configured in env")
         
         sys.exit(1)
 
