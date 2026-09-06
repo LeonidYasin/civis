@@ -5,9 +5,12 @@ Survey state handlers for Civis bot.
 
 import logging
 
-from telebot.types import Message
+from telebot.types import Message, ReplyKeyboardRemove
 
-from database import get_user, save_user, get_session, set_session, clear_session, create_subscription
+from database import (
+    get_user, save_user, get_session, set_session, clear_session,
+    create_subscription, save_offer, save_request
+)
 from locales import TEXTS, VALUE_MAP
 from keyboards import (
     get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard
