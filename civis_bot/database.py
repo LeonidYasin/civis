@@ -187,7 +187,7 @@ def save_offer(tg_id, text):
 def get_all_offers():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT tg_id, text, created_at FROM offers ORDER BY created_at DESC")
+    cur.execute("SELECT id, tg_id, text, created_at FROM offers ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -201,11 +201,14 @@ def get_my_offers(tg_id):
     return rows
 
 def delete_offer(offer_id, tg_id):
+    """Delete an offer by ID if it belongs to the user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM offers WHERE id = ? AND tg_id = ?", (offer_id, tg_id))
+    affected = cur.rowcount
     conn.commit()
     conn.close()
+    return affected > 0
 
 # --- REQUEST FUNCTIONS ---
 def save_request(tg_id, text):
@@ -219,7 +222,7 @@ def save_request(tg_id, text):
 def get_all_requests():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT tg_id, text, created_at FROM requests ORDER BY created_at DESC")
+    cur.execute("SELECT id, tg_id, text, created_at FROM requests ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -233,17 +236,36 @@ def get_my_requests(tg_id):
     return rows
 
 def delete_request(req_id, tg_id):
+    """Delete a request by ID if it belongs to the user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM requests WHERE id = ? AND tg_id = ?", (req_id, tg_id))
+    affected = cur.rowcount
     conn.commit()
     conn.close()
+    return affected > 0
 
 # --- CITIZEN FUNCTIONS ---
 def get_all_citizens():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT username, name, role, user_values FROM users WHERE status = 'completed'")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def search_citizens(query):
+    """Search citizens by name, role, or values"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    search_pattern = f"%{query}%"
+    cur.execute("""
+        SELECT username, name, role, user_values, about_text
+        FROM users
+        WHERE status = 'completed'
+        AND (name LIKE ? OR role LIKE ? OR user_values LIKE ? OR about_text LIKE ?)
+        LIMIT 20
+    """, (search_pattern, search_pattern, search_pattern, search_pattern))
     rows = cur.fetchall()
     conn.close()
     return rows
