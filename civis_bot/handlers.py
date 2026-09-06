@@ -1,35 +1,80 @@
 #!/usr/bin/env python3
 """
-Command handlers for Civis bot.
-Contains all bot command handlers including subscription, AI key, and matching.
+Handlers for Civis bot commands.
 """
 
 import logging
 import json
-import requests
 from datetime import datetime
-from telebot.types import Message, ReplyKeyboardRemove
+
+from telebot.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, BotCommand
 
 from database import (
     get_user, save_user, get_session, set_session, clear_session,
-    get_all_citizens, get_all_offers, get_all_requests,
-    get_my_offers, get_my_requests, save_offer, save_request,
-    get_openai_key, save_openai_key,
+    get_all_citizens, get_my_offers, get_my_requests,
+    get_all_offers, get_all_requests,
+    save_offer, save_request, delete_offer, delete_request,
     get_subscription, create_subscription, update_subscription_plan,
-    can_use_match, get_matches_remaining, increment_matches_used
+    can_use_match, get_matches_remaining, increment_matches_used,
+    get_openai_key, save_openai_key
 )
-from locales import TEXTS, VALUE_MAP, get_value_buttons, get_roles, get_formats
+from locales import TEXTS, VALUE_MAP
 from keyboards import (
-    get_language_keyboard, get_main_keyboard, get_values_keyboard,
-    get_roles_keyboard, get_formats_keyboard, get_subscribe_keyboard
+    get_main_keyboard, get_language_keyboard,
+    get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
-from utils import get_text, get_embedding_profile, get_embedding, find_matches
+from utils import get_text, get_embedding_profile
+from config import get_proxy_url
 
 logger = logging.getLogger(__name__)
 
+# Global bot reference (set in bot.py)
+bot = None
+
+def set_bot(bot_instance):
+    global bot
+    bot = bot_instance
+
+# --- REGISTRATION HANDLERS ---
+
+def register_handlers():
+    """Register all command handlers with the bot"""
+    if not bot:
+        raise RuntimeError("Bot not set. Call set_bot() first.")
+    
+    # Command handlers
+    bot.message_handler(commands=['start'])(cmd_start)
+    bot.message_handler(commands=['profile'])(cmd_profile)
+    bot.message_handler(commands=['embedding'])(cmd_embedding)
+    bot.message_handler(commands=['citizens'])(cmd_citizens)
+    bot.message_handler(commands=['offers'])(cmd_offers)
+    bot.message_handler(commands=['requests'])(cmd_requests)
+    bot.message_handler(commands=['my_offers'])(cmd_my_offers)
+    bot.message_handler(commands=['my_requests'])(cmd_my_requests)
+    bot.message_handler(commands=['marketplace'])(cmd_marketplace)
+    bot.message_handler(commands=['help'])(cmd_help)
+    bot.message_handler(commands=['survey'])(cmd_survey)
+    bot.message_handler(commands=['status'])(cmd_status)
+    bot.message_handler(commands=['cancel'])(cmd_cancel)
+    bot.message_handler(commands=['done'])(cmd_done)
+    bot.message_handler(commands=['offer'])(cmd_offer)
+    bot.message_handler(commands=['request'])(cmd_request)
+    bot.message_handler(commands=['language'])(cmd_language)
+    bot.message_handler(commands=['subscribe'])(cmd_subscribe)
+    bot.message_handler(commands=['setkey'])(cmd_setkey)
+    bot.message_handler(commands=['match'])(cmd_match)
+    
+    # Language selection handler
+    bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
+    
+    # Survey state handler
+    bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
+    
+    logger.info("All handlers registered")
+
 # --- COMMAND HANDLERS ---
 
-def cmd_start(message: Message, bot):
+def cmd_start(message: Message):
     tg_id = message.from_user.id
     username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
@@ -37,9 +82,6 @@ def cmd_start(message: Message, bot):
     user = get_user(tg_id)
     if user and user.get('status') == 'completed':
         lang = user.get('language', 'en')
-        # Ensure subscription exists
-        if not get_subscription(tg_id):
-            create_subscription(tg_id)
         bot.reply_to(
             message,
             get_text(tg_id, 'welcome_citizen', name=user.get('name', 'friend')),
@@ -54,7 +96,7 @@ def cmd_start(message: Message, bot):
         reply_markup=get_language_keyboard()
     )
 
-def cmd_profile(message: Message, bot):
+def cmd_profile(message: Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -62,24 +104,18 @@ def cmd_profile(message: Message, bot):
         return
     
     lang = user.get('language', 'en')
-    sub = get_subscription(tg_id)
-    matches_left = get_matches_remaining(tg_id)
-    plan = sub.get('plan', 'free') if sub else 'free'
-    
     profile_text = (
         f"{get_text(tg_id, 'profile')}\n\n"
         f"Name: {user.get('name', 'N/A')}\n"
         f"Telegram: @{user.get('username', 'N/A')}\n"
         f"Role: {user.get('role', 'N/A')}\n"
         f"Values: {user.get('user_values', 'N/A')}\n"
-        f"Format: {user.get('format', 'N/A')}\n"
-        f"Plan: {plan}\n"
-        f"Matches left: {matches_left if matches_left != float('inf') else 'unlimited'}\n\n"
+        f"Format: {user.get('format', 'N/A')}\n\n"
         f"About:\n{user.get('about_text', 'N/A')}"
     )
     bot.reply_to(message, profile_text)
 
-def cmd_embedding(message: Message, bot):
+def cmd_embedding(message: Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -93,7 +129,7 @@ def cmd_embedding(message: Message, bot):
         parse_mode='Markdown'
     )
 
-def cmd_citizens(message: Message, bot):
+def cmd_citizens(message: Message):
     tg_id = message.from_user.id
     rows = get_all_citizens()
     if not rows:
@@ -105,7 +141,7 @@ def cmd_citizens(message: Message, bot):
         text += f"@{username or 'unknown'} - {name} ({role})\n   Values: {values}\n\n"
     bot.reply_to(message, text)
 
-def cmd_offers(message: Message, bot):
+def cmd_offers(message: Message):
     rows = get_all_offers()
     if not rows:
         bot.reply_to(message, "No offers yet. Use /offer to publish one!")
@@ -118,7 +154,7 @@ def cmd_offers(message: Message, bot):
         text += f"@{name}: {offer_text}\n\n"
     bot.reply_to(message, text)
 
-def cmd_requests(message: Message, bot):
+def cmd_requests(message: Message):
     rows = get_all_requests()
     if not rows:
         bot.reply_to(message, "No requests yet. Use /request to publish one!")
@@ -131,7 +167,7 @@ def cmd_requests(message: Message, bot):
         text += f"@{name}: {req_text}\n\n"
     bot.reply_to(message, text)
 
-def cmd_my_offers(message: Message, bot):
+def cmd_my_offers(message: Message):
     tg_id = message.from_user.id
     rows = get_my_offers(tg_id)
     if not rows:
@@ -143,7 +179,7 @@ def cmd_my_offers(message: Message, bot):
         text += f"ID {id}: {offer_text}\n\n"
     bot.reply_to(message, text)
 
-def cmd_my_requests(message: Message, bot):
+def cmd_my_requests(message: Message):
     tg_id = message.from_user.id
     rows = get_my_requests(tg_id)
     if not rows:
@@ -155,7 +191,7 @@ def cmd_my_requests(message: Message, bot):
         text += f"ID {id}: {req_text}\n\n"
     bot.reply_to(message, text)
 
-def cmd_marketplace(message: Message, bot):
+def cmd_marketplace(message: Message):
     tg_id = message.from_user.id
     offers = get_all_offers()
     requests = get_all_requests()
@@ -181,18 +217,17 @@ def cmd_marketplace(message: Message, bot):
     
     bot.reply_to(message, text)
 
-def cmd_help(message: Message, bot):
-    tg_id = message.from_user.id
-    bot.reply_to(message, get_text(tg_id, 'help'))
+def cmd_help(message: Message):
+    bot.reply_to(message, get_text(message.from_user.id, 'help'))
 
-def cmd_survey(message: Message, bot):
+def cmd_survey(message: Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
     lang = user.get('language', 'en') if user else 'en'
     set_session(tg_id, 'survey_name', {'language': lang})
     bot.reply_to(message, get_text(tg_id, 'name_ask'), reply_markup=ReplyKeyboardRemove())
 
-def cmd_status(message: Message, bot):
+def cmd_status(message: Message):
     tg_id = message.from_user.id
     try:
         me = bot.get_me()
@@ -211,17 +246,17 @@ def cmd_status(message: Message, bot):
             f"Citizens: {count}\n"
             f"Offers: {offers_count}\n"
             f"Requests: {requests_count}\n"
-            f"Proxy: {proxy_url or 'None'}"
+            f"Proxy: {get_proxy_url() or 'None'}"
         )
     except Exception as e:
         bot.reply_to(message, f"Error: {e}")
 
-def cmd_cancel(message: Message, bot):
+def cmd_cancel(message: Message):
     tg_id = message.from_user.id
     clear_session(tg_id)
     bot.reply_to(message, get_text(tg_id, 'cancel'))
 
-def cmd_done(message: Message, bot):
+def cmd_done(message: Message):
     tg_id = message.from_user.id
     state, data = get_session(tg_id)
     if state != 'survey_values':
@@ -240,7 +275,7 @@ def cmd_done(message: Message, bot):
     set_session(tg_id, 'survey_role', data)
     bot.reply_to(message, TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'], reply_markup=get_roles_keyboard(lang))
 
-def cmd_offer(message: Message, bot):
+def cmd_offer(message: Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -251,7 +286,7 @@ def cmd_offer(message: Message, bot):
     set_session(tg_id, 'offer', {'language': lang})
     bot.reply_to(message, get_text(tg_id, 'offer_prompt'), reply_markup=ReplyKeyboardRemove())
 
-def cmd_request(message: Message, bot):
+def cmd_request(message: Message):
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -262,9 +297,18 @@ def cmd_request(message: Message, bot):
     set_session(tg_id, 'request', {'language': lang})
     bot.reply_to(message, get_text(tg_id, 'request_prompt'), reply_markup=ReplyKeyboardRemove())
 
-# --- SUBSCRIPTION HANDLERS ---
+def cmd_language(message: Message):
+    tg_id = message.from_user.id
+    logger.info(f"Received /language from {tg_id}")
+    
+    set_session(tg_id, 'language_select', {})
+    bot.reply_to(
+        message,
+        "Choose your language:\n\nEnglish / Русский",
+        reply_markup=get_language_keyboard()
+    )
 
-def cmd_subscribe(message: Message, bot):
+def cmd_subscribe(message: Message):
     """Show subscription plans"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -278,46 +322,33 @@ def cmd_subscribe(message: Message, bot):
         create_subscription(tg_id)
         sub = get_subscription(tg_id)
     
-    current_plan = sub.get('plan', 'free')
-    matches_left = get_matches_remaining(tg_id)
+    remaining = get_matches_remaining(tg_id)
     
-    text = f"""💳 **Civis Subscription Plans**
+    text = f"""💳 **Subscription Plans**
 
-Current plan: **{current_plan}**
-Matches remaining: **{matches_left if matches_left != float('inf') else 'unlimited'}**
+Current plan: {sub['plan'].upper()}
+Matches remaining: {remaining if remaining != float('inf') else '∞'}
 
----
+📌 **Free** — $0/month
+  • 3 matches/month
+  • Basic profile
+  • View citizens
 
-**Free** - $0/month
-- 3 AI matches per month
-- Basic profile
-- View citizens
+⭐ **Premium** — $9.99/month
+  • Unlimited matches
+  • Priority in search
+  • Export profile (JSON)
+  • Early access to new features
 
-**Premium** - $9.99/month
-- Unlimited AI matches
-- Priority in search results
-- Export your profile
-- Early access to new features
+🚀 **Lifetime** — $99 one-time
+  • All Premium features
+  • MCP tools access
+  • Lifetime updates
 
-**Lifetime** - $99 one-time
-- All Premium features
-- Access to MCP tools
-- Priority support
+To upgrade, send /setkey to use your own OpenAI key, or contact @civis_support for payment."""
+    bot.reply_to(message, text, parse_mode='Markdown')
 
----
-
-Click below to subscribe:"""
-    
-    bot.reply_to(
-        message,
-        text,
-        parse_mode='Markdown',
-        reply_markup=get_subscribe_keyboard(lang)
-    )
-
-# --- AI KEY HANDLER ---
-
-def cmd_setkey(message: Message, bot):
+def cmd_setkey(message: Message):
     """Set OpenAI API key"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -325,113 +356,134 @@ def cmd_setkey(message: Message, bot):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    # Check if key provided
+    # Check if key is provided
     parts = message.text.split()
     if len(parts) < 2:
         bot.reply_to(
             message,
-            "Please provide your OpenAI API key.\n"
-            "Example: /setkey sk-...\n\n"
-            "You can get a key from: https://platform.openai.com/api-keys"
+            "Please provide your OpenAI API key:\n"
+            "`/setkey sk-...`\n\n"
+            "You can get your key at: https://platform.openai.com/api-keys"
         )
         return
     
-    key = parts[1].strip()
-    
-    # Validate key (quick check)
-    try:
-        headers = {
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json"
-        }
-        response = requests.get(
-            "https://api.openai.com/v1/models",
-            headers=headers,
-            timeout=10
-        )
-        if response.status_code != 200:
-            bot.reply_to(message, "❌ Invalid API key. Please check and try again.")
-            return
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error validating key: {e}")
+    key = parts[1]
+    if not key.startswith('sk-') or len(key) < 20:
+        bot.reply_to(message, "❌ Invalid OpenAI key format. It should start with 'sk-'. Please check and try again.")
         return
     
-    # Save key
     save_openai_key(tg_id, key)
-    bot.reply_to(message, "✅ OpenAI API key saved successfully!")
+    bot.reply_to(message, "✅ OpenAI key saved successfully! You can now use /match for AI-powered matching.")
 
-# --- MATCH HANDLER ---
-
-def cmd_match(message: Message, bot):
-    """Find matches using AI"""
+def cmd_match(message: Message):
+    """AI-powered matching"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    # Check if can use match
-    if not can_use_match(tg_id):
-        matches_left = get_matches_remaining(tg_id)
-        bot.reply_to(
-            message,
-            f"❌ You've used all your free matches.\n"
-            f"Remaining: {matches_left}\n\n"
-            "Subscribe to get unlimited matches: /subscribe"
-        )
-        return
-    
-    # Get OpenAI key
+    # Check if user has OpenAI key
     openai_key = get_openai_key(tg_id)
     if not openai_key:
         bot.reply_to(
             message,
-            "❌ Please set your OpenAI API key first: /setkey sk-...\n\n"
-            "You can get a key from: https://platform.openai.com/api-keys"
+            "❌ You need to set your OpenAI API key first.\n"
+            "Use `/setkey sk-...` to set your key."
         )
         return
+    
+    # Check subscription
+    if not can_use_match(tg_id):
+        remaining = get_matches_remaining(tg_id)
+        bot.reply_to(
+            message,
+            f"❌ You've used all your free matches.\n"
+            f"Remaining: {remaining}\n"
+            "Use `/subscribe` to upgrade to Premium."
+        )
+        return
+    
+    # Increment match count
+    increment_matches_used(tg_id)
     
     # Get all citizens
     citizens = get_all_citizens()
     if not citizens:
-        bot.reply_to(message, "No other citizens yet. Check back later!")
+        bot.reply_to(message, "No citizens to match with yet. Come back later!")
         return
     
-    # Get current user's embedding
-    my_embedding = get_embedding(user, openai_key)
-    if not my_embedding:
-        bot.reply_to(message, "❌ Error generating your profile embedding. Please try again.")
+    # Build prompt for OpenAI
+    user_profile = f"""Name: {user.get('name', 'Unknown')}
+Role: {user.get('role', 'N/A')}
+Values: {user.get('user_values', 'N/A')}
+About: {user.get('about_text', 'N/A')}"""
+    
+    citizens_list = []
+    for username, name, role, values in citizens:
+        if tg_id != get_user_by_username(username):  # Skip self
+            citizens_list.append(f"@{username} - {name} ({role})")
+    
+    if not citizens_list:
+        bot.reply_to(message, "No other citizens to match with yet. Share the bot with friends!")
         return
     
-    # Find matches
-    matches = find_matches(my_embedding, citizens, openai_key)
-    
-    if not matches:
-        bot.reply_to(message, "No matches found yet. Try updating your profile with more details!")
-        return
-    
-    # Increment matches used
-    increment_matches_used(tg_id)
-    
-    # Format results
-    lang = user.get('language', 'en')
-    text = f"🤝 **Your Top Matches**\n\n"
-    
-    for i, match in enumerate(matches[:5], 1):
-        text += f"{i}. @{match.get('username', 'unknown')} - {match.get('name', 'Unknown')}\n"
-        text += f"   Role: {match.get('role', 'N/A')}\n"
-        text += f"   Values: {match.get('user_values', 'N/A')}\n"
-        text += f"   Match score: {match.get('score', 0)}%\n\n"
-    
-    matches_left = get_matches_remaining(tg_id)
-    text += f"\n---\nMatches remaining: {matches_left if matches_left != float('inf') else 'unlimited'}"
-    
-    bot.reply_to(message, text, parse_mode='Markdown')
+    # This is a placeholder — we'll implement OpenAI call in the next step
+    bot.reply_to(
+        message,
+        f"🔍 AI Matching in progress...\n\n"
+        f"Your profile:\n{user_profile}\n\n"
+        f"We're analyzing {len(citizens_list)} other citizens.\n"
+        f"Full AI matching coming soon!"
+    )
 
-# --- SURVEY STATE HANDLERS (from bot_sync) ---
+def get_user_by_username(username):
+    """Helper to get user by username"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT tg_id FROM users WHERE username = ?", (username,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
 
-def handle_survey(message: Message, bot):
-    """Handle survey states - natural conversation"""
+# --- LANGUAGE SELECTION ---
+
+def handle_language_selection(message: Message):
+    tg_id = message.from_user.id
+    text = message.text
+    
+    lang = 'en' if text == "English" else 'ru'
+    
+    user = get_user(tg_id)
+    if user:
+        save_user(tg_id, user.get('username', 'unknown'), language=lang)
+    else:
+        save_user(tg_id, message.from_user.username or "unknown", language=lang)
+    
+    state, _ = get_session(tg_id)
+    if state == 'language_select':
+        clear_session(tg_id)
+    
+    user = get_user(tg_id)
+    if user and user.get('status') == 'completed':
+        bot.reply_to(
+            message,
+            TEXTS[lang]['language_changed'] + "\n\n" + TEXTS[lang]['welcome_citizen'].format(name=user.get('name', '')),
+            reply_markup=get_main_keyboard(lang)
+        )
+    else:
+        bot.reply_to(
+            message,
+            TEXTS[lang]['language_set'] + "\n\n" + TEXTS[lang]['welcome'],
+            reply_markup=ReplyKeyboardRemove()
+        )
+        
+        set_session(tg_id, 'survey_name', {'language': lang})
+        bot.send_message(tg_id, TEXTS[lang]['name_ask'])
+
+# --- SURVEY HANDLERS ---
+
+def handle_survey(message: Message):
     tg_id = message.from_user.id
     text = message.text.strip()
     
@@ -439,7 +491,7 @@ def handle_survey(message: Message, bot):
         return
     
     state, data = get_session(tg_id)
-    if not state or state == 'language_select':
+    if not state:
         lang = get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
         bot.reply_to(message, get_text(tg_id, 'unknown'), reply_markup=get_main_keyboard(lang))
         return
@@ -503,12 +555,37 @@ def handle_survey(message: Message, bot):
             bot.reply_to(message, f"Please choose a value from the buttons.\n\nCurrent selection: {len(selected)}/3")
     
     elif state == 'survey_role':
-        roles = get_roles(lang)
-        if text not in roles:
-            bot.reply_to(message, f"Please select a role from the buttons: {', '.join(roles)}")
-            return
+        roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
+        # Check if text is in the list (with language support)
+        valid_roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
+        if lang == 'ru':
+            ru_roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
+            if text in ru_roles:
+                # Map to English for storage
+                role_map = {
+                    "Исполнитель": "Executor",
+                    "Заказчик": "Customer",
+                    "Координатор": "Coordinator",
+                    "Инвестор": "Investor",
+                    "Продавец": "Seller",
+                    "Покупатель": "Buyer"
+                }
+                data['role'] = role_map[text]
+            else:
+                bot.reply_to(
+                    message,
+                    f"Пожалуйста, выберите роль из кнопок: {', '.join(ru_roles)}"
+                )
+                return
+        else:
+            if text not in valid_roles:
+                bot.reply_to(
+                    message,
+                    f"Please select a role from the buttons: {', '.join(valid_roles)}"
+                )
+                return
+            data['role'] = text
         
-        data['role'] = text
         set_session(tg_id, 'survey_format', data)
         bot.reply_to(message, TEXTS[lang]['format_ask'], reply_markup=get_formats_keyboard(lang))
     
@@ -536,10 +613,10 @@ def handle_survey(message: Message, bot):
                 status='completed'
             )
             
-            # Create subscription for new user
-            create_subscription(tg_id)
-            
             clear_session(tg_id)
+            
+            # Create subscription for user
+            create_subscription(tg_id)
             
             bot.reply_to(
                 message,
@@ -555,6 +632,7 @@ def handle_survey(message: Message, bot):
     
     elif state == 'offer':
         save_offer(tg_id, text)
+        lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
             get_text(tg_id, 'offer_saved') + "\n\n" + get_text(tg_id, 'welcome_citizen', name=get_user(tg_id).get('name', '')),
@@ -564,45 +642,10 @@ def handle_survey(message: Message, bot):
     
     elif state == 'request':
         save_request(tg_id, text)
+        lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
             get_text(tg_id, 'request_saved') + "\n\n" + get_text(tg_id, 'welcome_citizen', name=get_user(tg_id).get('name', '')),
             reply_markup=get_main_keyboard(lang)
         )
         clear_session(tg_id)
-
-# --- LANGUAGE SELECTION ---
-
-def handle_language_selection(message: Message, bot):
-    """Handle language selection"""
-    tg_id = message.from_user.id
-    text = message.text
-    
-    lang = 'en' if text == "English" else 'ru'
-    
-    user = get_user(tg_id)
-    if user:
-        save_user(tg_id, user.get('username', 'unknown'), language=lang)
-    else:
-        save_user(tg_id, message.from_user.username or "unknown", language=lang)
-    
-    state, _ = get_session(tg_id)
-    if state == 'language_select':
-        clear_session(tg_id)
-    
-    user = get_user(tg_id)
-    if user and user.get('status') == 'completed':
-        bot.reply_to(
-            message,
-            TEXTS[lang]['language_changed'] + "\n\n" + TEXTS[lang]['welcome_citizen'].format(name=user.get('name', '')),
-            reply_markup=get_main_keyboard(lang)
-        )
-    else:
-        bot.reply_to(
-            message,
-            TEXTS[lang]['language_set'] + "\n\n" + TEXTS[lang]['welcome'],
-            reply_markup=ReplyKeyboardRemove()
-        )
-        
-        set_session(tg_id, 'survey_name', {'language': lang})
-        bot.send_message(tg_id, TEXTS[lang]['name_ask'])
