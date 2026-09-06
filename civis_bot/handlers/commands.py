@@ -39,6 +39,17 @@ def set_bot(bot_instance):
     set_survey_bot(bot_instance)
     set_language_bot(bot_instance)
 
+def log_message(message: Message, prefix=""):
+    """Helper to log message details"""
+    tg_id = message.from_user.id
+    username = message.from_user.username or "unknown"
+    chat_type = message.chat.type
+    chat_id = message.chat.id
+    text = message.text or ""
+    logger.info(f"{prefix} msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
+    if chat_type in ['group', 'supergroup']:
+        logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
+
 # --- REGISTRATION ---
 
 def register_handlers():
@@ -46,24 +57,7 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
-    # === LOG ALL MESSAGES (MUST NOT BLOCK) ===
-    # IMPORTANT: this handler must return True to let other handlers process
-    def log_all_messages(message: Message):
-        tg_id = message.from_user.id
-        username = message.from_user.username or "unknown"
-        chat_type = message.chat.type
-        chat_id = message.chat.id
-        text = message.text or ""
-        logger.info(f"[ALL] msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
-        if chat_type in ['group', 'supergroup']:
-            logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
-        # Return True to continue processing to other handlers
-        return True
-    
-    # Register logger FIRST — it must return True
-    bot.message_handler(func=lambda m: True, content_types=['text'])(log_all_messages)
-    
-    # === COMMAND HANDLERS ===
+    # Register handlers WITHOUT a catch-all logger that blocks
     bot.message_handler(commands=['start'])(cmd_start)
     bot.message_handler(commands=['profile'])(cmd_profile)
     bot.message_handler(commands=['embedding'])(cmd_embedding)
@@ -92,7 +86,7 @@ def register_handlers():
     # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages)
+    # Survey state handler (catch-all for text messages — must be last)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
@@ -100,6 +94,7 @@ def register_handlers():
 # --- COMMAND HANDLERS ---
 
 def cmd_start(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
@@ -122,6 +117,7 @@ def cmd_start(message: Message):
     )
 
 def cmd_profile(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -141,6 +137,7 @@ def cmd_profile(message: Message):
     bot.reply_to(message, profile_text)
 
 def cmd_embedding(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -155,6 +152,7 @@ def cmd_embedding(message: Message):
     )
 
 def cmd_citizens(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_all_citizens()
     if not rows:
@@ -167,6 +165,7 @@ def cmd_citizens(message: Message):
     bot.reply_to(message, text)
 
 def cmd_offers(message: Message):
+    log_message(message, "[CMD]")
     rows = get_all_offers()
     if not rows:
         bot.reply_to(message, "No offers yet. Use /offer to publish one!")
@@ -185,6 +184,7 @@ def cmd_offers(message: Message):
     bot.reply_to(message, text)
 
 def cmd_requests(message: Message):
+    log_message(message, "[CMD]")
     rows = get_all_requests()
     if not rows:
         bot.reply_to(message, "No requests yet. Use /request to publish one!")
@@ -203,6 +203,7 @@ def cmd_requests(message: Message):
     bot.reply_to(message, text)
 
 def cmd_my_offers(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_my_offers(tg_id)
     if not rows:
@@ -216,6 +217,7 @@ def cmd_my_offers(message: Message):
     bot.reply_to(message, text)
 
 def cmd_my_requests(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_my_requests(tg_id)
     if not rows:
@@ -229,6 +231,7 @@ def cmd_my_requests(message: Message):
     bot.reply_to(message, text)
 
 def cmd_delete_offer(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -252,6 +255,7 @@ def cmd_delete_offer(message: Message):
         bot.reply_to(message, f"❌ Offer #{offer_id} not found or you don't have permission to delete it.")
 
 def cmd_delete_request(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -275,6 +279,7 @@ def cmd_delete_request(message: Message):
         bot.reply_to(message, f"❌ Request #{req_id} not found or you don't have permission to delete it.")
 
 def cmd_marketplace(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     offers = get_all_offers()
     requests = get_all_requests()
@@ -311,9 +316,11 @@ def cmd_marketplace(message: Message):
     bot.reply_to(message, text)
 
 def cmd_help(message: Message):
+    log_message(message, "[CMD]")
     bot.reply_to(message, get_text(message.from_user.id, 'help'))
 
 def cmd_survey(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     lang = user.get('language', 'en') if user else 'en'
@@ -321,6 +328,7 @@ def cmd_survey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'name_ask'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_status(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     try:
         me = bot.get_me()
@@ -345,11 +353,13 @@ def cmd_status(message: Message):
         bot.reply_to(message, f"Error: {e}")
 
 def cmd_cancel(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     clear_session(tg_id)
     bot.reply_to(message, get_text(tg_id, 'cancel'))
 
 def cmd_done(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     state, data = get_session(tg_id)
     if state != 'survey_values':
@@ -369,6 +379,7 @@ def cmd_done(message: Message):
     bot.reply_to(message, TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'], reply_markup=get_roles_keyboard(lang))
 
 def cmd_offer(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -380,6 +391,7 @@ def cmd_offer(message: Message):
     bot.reply_to(message, get_text(tg_id, 'offer_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_request(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -391,6 +403,7 @@ def cmd_request(message: Message):
     bot.reply_to(message, get_text(tg_id, 'request_prompt'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_language(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     logger.info(f"Received /language from {tg_id}")
     
@@ -402,6 +415,7 @@ def cmd_language(message: Message):
     )
 
 def cmd_subscribe(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     
     user = get_user(tg_id)
@@ -437,6 +451,7 @@ def cmd_subscribe(message: Message):
     bot.reply_to(message, text)
 
 def cmd_setkey(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -457,6 +472,7 @@ def cmd_setkey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'setkey_saved'))
 
 def cmd_match(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -503,6 +519,7 @@ About: {user.get('about_text', 'N/A')}"""
     )
 
 def cmd_search(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -535,6 +552,7 @@ def cmd_search(message: Message):
     bot.reply_to(message, text)
 
 def cmd_support(message: Message):
+    log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
