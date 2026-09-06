@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal bot version for connection testing.
-Redirects all output to file to avoid Windows console encoding issues.
+Minimal bot for connection testing with proxy support from .env
 """
 
 import asyncio
@@ -15,12 +14,16 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
 
-# --- LOGGING TO FILE (bypass Windows console) ---
+# Proxy support
+import aiohttp
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiohttp_socks import ProxyConnector
+
+# --- LOGGING ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('bot_minimal.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -30,18 +33,59 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    print("ERROR: BOT_TOKEN not found in .env file!")
+    logger.error("ERROR: BOT_TOKEN not found in .env file!")
     sys.exit(1)
-print("Token loaded")
+logger.info("Token loaded")
+
+# --- PROXY SETUP ---
+def get_proxy_connector():
+    """Create proxy connector from .env or environment variables"""
+    # First check .env
+    proxy_url = os.getenv("PROXY_URL")
+    if proxy_url:
+        logger.info(f"Proxy from .env: {proxy_url}")
+        return ProxyConnector.from_url(proxy_url)
+    
+    # Then check system env
+    http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+    https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+    
+    if https_proxy:
+        logger.info(f"Proxy from HTTPS_PROXY: {https_proxy}")
+        return ProxyConnector.from_url(https_proxy)
+    elif http_proxy:
+        logger.info(f"Proxy from HTTP_PROXY: {http_proxy}")
+        return ProxyConnector.from_url(http_proxy)
+    
+    logger.info("No proxy configured, using direct connection")
+    return None
+
+# --- CREATE SESSION ---
+def create_bot_session():
+    """Create bot with proxy support if configured"""
+    connector = get_proxy_connector()
+    if connector:
+        # Create aiohttp session with proxy
+        aiohttp_session = aiohttp.ClientSession(connector=connector)
+        aiogram_session = AiohttpSession(session=aiohttp_session)
+        return aiogram_session
+    else:
+        # Use default session
+        return None
 
 # --- BOT INIT ---
-bot = Bot(token=TOKEN)
+session = create_bot_session()
+if session:
+    bot = Bot(token=TOKEN, session=session)
+else:
+    bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- HANDLERS ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    print(f"[INFO] Received /start from {message.from_user.id}")
+    """Handler for /start command"""
+    logger.info(f"Received /start from {message.from_user.id}")
     await message.answer(
         "Hello! I am a minimal test bot for Civis.\n"
         "If you see this - connection to Telegram API works!\n\n"
@@ -53,7 +97,8 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("ping"))
 async def cmd_ping(message: Message):
-    print(f"[INFO] Received /ping from {message.from_user.id}")
+    """Check connection"""
+    logger.info(f"Received /ping from {message.from_user.id}")
     start_time = datetime.now()
     await message.answer("Pong!")
     end_time = datetime.now()
@@ -62,7 +107,8 @@ async def cmd_ping(message: Message):
 
 @dp.message(Command("echo"))
 async def cmd_echo(message: Message):
-    print(f"[INFO] Received /echo from {message.from_user.id}")
+    """Echo user text"""
+    logger.info(f"Received /echo from {message.from_user.id}")
     text = message.text.replace("/echo", "", 1).strip()
     if text:
         await message.answer(f"Echo: {text}")
@@ -71,7 +117,8 @@ async def cmd_echo(message: Message):
 
 @dp.message(Command("info"))
 async def cmd_info(message: Message):
-    print(f"[INFO] Received /info from {message.from_user.id}")
+    """Bot information"""
+    logger.info(f"Received /info from {message.from_user.id}")
     try:
         me = await bot.me()
         await message.answer(
@@ -82,46 +129,58 @@ async def cmd_info(message: Message):
             f"Token: {TOKEN[:10]}...{TOKEN[-5:]}"
         )
     except Exception as e:
-        print(f"[ERROR] Error getting bot info: {e}")
+        logger.error(f"Error getting bot info: {e}")
         await message.answer(f"Error: {e}")
 
 @dp.message()
 async def handle_unknown(message: Message):
-    print(f"[INFO] Unknown message from {message.from_user.id}: {message.text}")
+    """Unknown message handler"""
+    logger.info(f"Unknown message from {message.from_user.id}: {message.text}")
     await message.answer(
         "Unknown command. Use /start for command list."
     )
 
 # --- MAIN ---
 async def main():
-    print("[INFO] Starting minimal bot...")
+    """Main function"""
+    logger.info("Starting minimal bot...")
     
     try:
-        print("[INFO] Checking connection to Telegram API...")
+        # Check connection to Telegram
+        logger.info("Checking connection to Telegram API...")
         me = await bot.me()
-        print(f"[INFO] Connected to Telegram API!")
-        print(f"[INFO] Bot name: {me.full_name}")
-        print(f"[INFO] Username: @{me.username}")
-        print(f"[INFO] ID: {me.id}")
+        logger.info(f"Connected to Telegram API!")
+        logger.info(f"Bot name: {me.full_name}")
+        logger.info(f"Username: @{me.username}")
+        logger.info(f"ID: {me.id}")
         
-        print("[INFO] Starting polling...")
+        # Start polling
+        logger.info("Starting polling...")
         await dp.start_polling(bot)
         
     except Exception as e:
-        print(f"[ERROR] Critical error: {e}")
-        print(f"[ERROR] Error type: {type(e).__name__}")
+        logger.error(f"Critical error: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
         
-        print("[INFO] Diagnostics:")
-        print(f"  - Python version: {sys.version}")
-        print(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+        # Diagnostics
+        logger.error("Diagnostics:")
+        logger.error(f"  - Python version: {sys.version}")
+        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
         
-        print("  - Checking network...")
+        # DNS check
         try:
             import socket
             socket.gethostbyname("api.telegram.org")
-            print("  DNS resolves: api.telegram.org")
+            logger.info("  DNS resolves: api.telegram.org")
         except Exception as dns_err:
-            print(f"  DNS error: {dns_err}")
+            logger.error(f"  DNS error: {dns_err}")
+        
+        # Proxy check
+        proxy_url = os.getenv("PROXY_URL")
+        if proxy_url:
+            logger.error(f"  Proxy configured in .env: {proxy_url}")
+        else:
+            logger.error("  Proxy not configured in .env")
         
         sys.exit(1)
 
@@ -129,7 +188,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("[INFO] Bot stopped by user")
+        logger.info("Bot stopped by user")
     except Exception as e:
-        print(f"[ERROR] Unhandled error: {e}")
+        logger.error(f"Unhandled error: {e}")
         sys.exit(1)
