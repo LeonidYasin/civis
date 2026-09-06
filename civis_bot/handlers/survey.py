@@ -85,6 +85,66 @@ def handle_survey(message: Message):
     
     lang = data.get('language', 'en')
     
+    # --- OFFER CATEGORY SELECTION ---
+    if state == 'offer_category':
+        # Map category names
+        category_map = {
+            'Общее': 'general', 'General': 'general',
+            'Такси': 'taxi', 'Taxi': 'taxi',
+            'Доставка': 'delivery', 'Delivery': 'delivery',
+            'Услуги': 'services', 'Services': 'services',
+            'Товары': 'goods', 'Goods': 'goods',
+            'Недвижимость': 'real_estate', 'Real Estate': 'real_estate',
+            'Другое': 'other', 'Other': 'other'
+        }
+        
+        if text in category_map:
+            data['category'] = category_map[text]
+            # Store category in session data
+            set_session(tg_id, 'offer', {'language': lang, 'category': data['category']})
+            bot.reply_to(
+                message,
+                f"📝 Category selected: {text}\n\n{get_text(tg_id, 'offer_prompt')}",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        else:
+            from keyboards import get_category_keyboard
+            bot.reply_to(
+                message,
+                "Please select a category from the buttons below:",
+                reply_markup=get_category_keyboard(lang)
+            )
+        return
+    
+    # --- REQUEST CATEGORY SELECTION ---
+    if state == 'request_category':
+        category_map = {
+            'Общее': 'general', 'General': 'general',
+            'Такси': 'taxi', 'Taxi': 'taxi',
+            'Доставка': 'delivery', 'Delivery': 'delivery',
+            'Услуги': 'services', 'Services': 'services',
+            'Товары': 'goods', 'Goods': 'goods',
+            'Недвижимость': 'real_estate', 'Real Estate': 'real_estate',
+            'Другое': 'other', 'Other': 'other'
+        }
+        
+        if text in category_map:
+            data['category'] = category_map[text]
+            set_session(tg_id, 'request', {'language': lang, 'category': data['category']})
+            bot.reply_to(
+                message,
+                f"📝 Category selected: {text}\n\n{get_text(tg_id, 'request_prompt')}",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        else:
+            from keyboards import get_category_keyboard
+            bot.reply_to(
+                message,
+                "Please select a category from the buttons below:",
+                reply_markup=get_category_keyboard(lang)
+            )
+        return
+    
     # --- BACK BUTTON HANDLING ---
     if text == "/back" or text == "Назад" or text == "Back":
         if state == 'survey_about':
@@ -269,7 +329,9 @@ def handle_survey(message: Message):
             bot.reply_to(message, "Error saving your profile. Please try again.")
     
     elif state == 'offer':
-        save_offer(tg_id, text)
+        # Get category from session data
+        category = data.get('category', 'general')
+        save_offer(tg_id, text, category=category)
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
@@ -279,7 +341,8 @@ def handle_survey(message: Message):
         clear_session(tg_id)
     
     elif state == 'request':
-        save_request(tg_id, text)
+        category = data.get('category', 'general')
+        save_request(tg_id, text, category=category)
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
