@@ -6,7 +6,7 @@ Command handlers for Civis bot.
 import logging
 import sqlite3
 
-from telebot.types import Message
+from telebot.types import Message, ReplyKeyboardRemove
 
 from database import (
     get_user, save_user, get_session, set_session, clear_session,
