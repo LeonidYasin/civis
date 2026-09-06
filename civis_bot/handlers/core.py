@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Core command handlers for Civis bot.
-Contains: start, profile, embedding, citizens, help, survey, status, cancel, done
+Contains: start, profile, embedding, citizens, help, survey, status, cancel, done, language
 """
 
 import logging
@@ -159,3 +159,15 @@ def cmd_done(message: Message):
     data['user_values'] = ', '.join(selected)
     set_session(tg_id, 'survey_role', data)
     bot.reply_to(message, TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'], reply_markup=get_roles_keyboard(lang))
+
+def cmd_language(message: Message):
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    logger.info(f"Received /language from {tg_id}")
+    
+    set_session(tg_id, 'language_select', {})
+    bot.reply_to(
+        message,
+        "Choose your language:\n\nEnglish / Русский",
+        reply_markup=get_language_keyboard()
+    )
