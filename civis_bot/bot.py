@@ -113,14 +113,17 @@ def handle_callback(call: CallbackQuery):
     # Get the command
     cmd = command_map[data]
     
+    # Get the original message ID for reply_to
+    original_msg_id = call.message.message_id
+    
     # Create a proper Message-like object with all required attributes
     class FakeMessage:
-        def __init__(self, text, from_user, chat):
+        def __init__(self, text, from_user, chat, message_id):
             self.text = text
             self.from_user = from_user
             self.chat = chat
             self.content_type = 'text'
-            self.message_id = 999999  # dummy message_id
+            self.message_id = message_id  # Use real message_id from callback
             self.reply_to_message = None
             self.date = int(time.time())
             self.entities = None
@@ -153,7 +156,8 @@ def handle_callback(call: CallbackQuery):
     fake_msg = FakeMessage(
         text=cmd,
         from_user=call.from_user,
-        chat=call.message.chat
+        chat=call.message.chat,
+        message_id=original_msg_id
     )
     
     # Process the command using bot's message handler
@@ -161,6 +165,7 @@ def handle_callback(call: CallbackQuery):
         bot.process_new_messages([fake_msg])
     except Exception as e:
         logger.error(f"Error processing callback command {cmd}: {e}")
+        # Send a new message instead of replying
         bot.send_message(call.message.chat.id, f"Error: {e}")
 
 # --- SET COMMANDS MENU (left sidebar) ---
