@@ -26,21 +26,32 @@ def get_main_keyboard(lang='en'):
     )
     # Row 2
     keyboard.row(
+        KeyboardButton("/my_offers"),
+        KeyboardButton("/my_requests")
+    )
+    # Row 3
+    keyboard.row(
+        KeyboardButton("/delete_offer"),
+        KeyboardButton("/delete_request")
+    )
+    # Row 4
+    keyboard.row(
         KeyboardButton("/marketplace"),
         KeyboardButton("/profile")
     )
-    # Row 3
+    # Row 5
     keyboard.row(
         KeyboardButton("/embedding"),
         KeyboardButton("/citizens")
     )
-    # Row 4
+    # Row 6
     keyboard.row(
         KeyboardButton("/subscribe"),
         KeyboardButton("/match")
     )
-    # Row 5
+    # Row 7
     keyboard.row(
+        KeyboardButton("/search"),
         KeyboardButton("/help")
     )
     
@@ -91,6 +102,10 @@ def get_values_keyboard(lang='en'):
     keyboard.row(
         KeyboardButton("/done")
     )
+    # Row 6 - Back button
+    keyboard.row(
+        KeyboardButton("/back")
+    )
     
     return keyboard
 
@@ -118,6 +133,10 @@ def get_roles_keyboard(lang='en'):
         KeyboardButton(roles[4]),
         KeyboardButton(roles[5])
     )
+    # Row 4 - Back button
+    keyboard.row(
+        KeyboardButton("/back")
+    )
     
     return keyboard
 
@@ -139,6 +158,10 @@ def get_formats_keyboard(lang='en'):
     keyboard.row(
         KeyboardButton(formats[2]),
         KeyboardButton(formats[3])
+    )
+    # Row 3 - Back button
+    keyboard.row(
+        KeyboardButton("/back")
     )
     
     return keyboard
