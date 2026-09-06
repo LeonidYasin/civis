@@ -186,12 +186,13 @@ async def process_format(message: types.Message, state: FSMContext):
 async def main():
     logging.basicConfig(level=logging.INFO)
     
-    # Создаём aiohttp.ClientSession с кастомным коннектором
+    # Создаём коннектор
     connector = get_proxy_connector()
-    client_session = aiohttp.ClientSession(connector=connector)
     
-    # Передаём клиентскую сессию в AiohttpSession
-    session = AiohttpSession(aiohttp_client_session=client_session)
+    # Создаём AiohttpSession с кастомным коннектором через kwargs
+    # В aiogram v3 AiohttpSession принимает любые kwargs для aiohttp.ClientSession
+    session = AiohttpSession(connector=connector)
+    
     bot = Bot(token=TOKEN, session=session)
     
     await dp.start_polling(bot)
