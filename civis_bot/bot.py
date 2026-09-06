@@ -12,7 +12,7 @@ from telebot import TeleBot
 
 from config import TOKEN, get_proxy_url
 from database import init_db
-from handlers import register_handlers, set_bot
+from handlers.commands import register_handlers, set_bot
 
 # --- LOGGING ---
 logging.basicConfig(
