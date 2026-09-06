@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Minimal bot version for connection testing.
-No emoji for Windows console compatibility.
+Redirects all output to file to avoid Windows console encoding issues.
 """
 
 import asyncio
@@ -15,11 +15,12 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
 
-# --- LOGGING SETUP (no emoji) ---
+# --- LOGGING TO FILE (bypass Windows console) ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
+        logging.FileHandler('bot_minimal.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -29,9 +30,9 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    logger.error("ERROR: BOT_TOKEN not found in .env file!")
+    print("ERROR: BOT_TOKEN not found in .env file!")
     sys.exit(1)
-logger.info("Token loaded")
+print("Token loaded")
 
 # --- BOT INIT ---
 bot = Bot(token=TOKEN)
@@ -40,8 +41,7 @@ dp = Dispatcher()
 # --- HANDLERS ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    """Handler for /start command"""
-    logger.info(f"Received /start from {message.from_user.id}")
+    print(f"[INFO] Received /start from {message.from_user.id}")
     await message.answer(
         "Hello! I am a minimal test bot for Civis.\n"
         "If you see this - connection to Telegram API works!\n\n"
@@ -53,8 +53,7 @@ async def cmd_start(message: Message):
 
 @dp.message(Command("ping"))
 async def cmd_ping(message: Message):
-    """Check connection"""
-    logger.info(f"Received /ping from {message.from_user.id}")
+    print(f"[INFO] Received /ping from {message.from_user.id}")
     start_time = datetime.now()
     await message.answer("Pong!")
     end_time = datetime.now()
@@ -63,8 +62,7 @@ async def cmd_ping(message: Message):
 
 @dp.message(Command("echo"))
 async def cmd_echo(message: Message):
-    """Echo user text"""
-    logger.info(f"Received /echo from {message.from_user.id}")
+    print(f"[INFO] Received /echo from {message.from_user.id}")
     text = message.text.replace("/echo", "", 1).strip()
     if text:
         await message.answer(f"Echo: {text}")
@@ -73,8 +71,7 @@ async def cmd_echo(message: Message):
 
 @dp.message(Command("info"))
 async def cmd_info(message: Message):
-    """Bot information"""
-    logger.info(f"Received /info from {message.from_user.id}")
+    print(f"[INFO] Received /info from {message.from_user.id}")
     try:
         me = await bot.me()
         await message.answer(
@@ -85,52 +82,46 @@ async def cmd_info(message: Message):
             f"Token: {TOKEN[:10]}...{TOKEN[-5:]}"
         )
     except Exception as e:
-        logger.error(f"Error getting bot info: {e}")
+        print(f"[ERROR] Error getting bot info: {e}")
         await message.answer(f"Error: {e}")
 
 @dp.message()
 async def handle_unknown(message: Message):
-    """Unknown message handler"""
-    logger.info(f"Unknown message from {message.from_user.id}: {message.text}")
+    print(f"[INFO] Unknown message from {message.from_user.id}: {message.text}")
     await message.answer(
         "Unknown command. Use /start for command list."
     )
 
 # --- MAIN ---
 async def main():
-    """Main function"""
-    logger.info("Starting minimal bot...")
+    print("[INFO] Starting minimal bot...")
     
     try:
-        # Check connection to Telegram
-        logger.info("Checking connection to Telegram API...")
+        print("[INFO] Checking connection to Telegram API...")
         me = await bot.me()
-        logger.info(f"Connected to Telegram API!")
-        logger.info(f"Bot name: {me.full_name}")
-        logger.info(f"Username: @{me.username}")
-        logger.info(f"ID: {me.id}")
+        print(f"[INFO] Connected to Telegram API!")
+        print(f"[INFO] Bot name: {me.full_name}")
+        print(f"[INFO] Username: @{me.username}")
+        print(f"[INFO] ID: {me.id}")
         
-        # Start polling
-        logger.info("Starting polling...")
+        print("[INFO] Starting polling...")
         await dp.start_polling(bot)
         
     except Exception as e:
-        logger.error(f"Critical error: {e}")
-        logger.error(f"Error type: {type(e).__name__}")
+        print(f"[ERROR] Critical error: {e}")
+        print(f"[ERROR] Error type: {type(e).__name__}")
         
-        # Diagnostics
-        logger.error("Diagnostics:")
-        logger.error(f"  - Python version: {sys.version}")
-        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
+        print("[INFO] Diagnostics:")
+        print(f"  - Python version: {sys.version}")
+        print(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
         
-        # Network check
-        logger.error("  - Checking network...")
+        print("  - Checking network...")
         try:
             import socket
             socket.gethostbyname("api.telegram.org")
-            logger.error("  DNS resolves: api.telegram.org")
+            print("  DNS resolves: api.telegram.org")
         except Exception as dns_err:
-            logger.error(f"  DNS error: {dns_err}")
+            print(f"  DNS error: {dns_err}")
         
         sys.exit(1)
 
@@ -138,7 +129,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user")
+        print("[INFO] Bot stopped by user")
     except Exception as e:
-        logger.error(f"Unhandled error: {e}")
+        print(f"[ERROR] Unhandled error: {e}")
         sys.exit(1)
