@@ -8,7 +8,7 @@ import logging
 
 from telebot.types import Message
 
-# Import helpers first
+# Import helpers first - get bot and set_bot
 from .helpers import set_bot, bot, get_bot
 
 # Import command modules
