@@ -46,8 +46,7 @@ def register_handlers():
     if not bot:
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
-    # Log all messages (for debugging groups) - using decorator style
-    @bot.message_handler(func=lambda m: True)
+    # Log all messages (for debugging groups) - MUST be registered first
     def log_all_messages(message: Message):
         tg_id = message.from_user.id
         username = message.from_user.username or "unknown"
@@ -57,87 +56,43 @@ def register_handlers():
         logger.info(f"[ALL] msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
         if chat_type in ['group', 'supergroup']:
             logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
+        # If it's a group and bot doesn't respond, this helps debug
     
-    # Command handlers - using decorator style
-    @bot.message_handler(commands=['start'])
-    def start(message): cmd_start(message)
-    
-    @bot.message_handler(commands=['profile'])
-    def profile(message): cmd_profile(message)
-    
-    @bot.message_handler(commands=['embedding'])
-    def embedding(message): cmd_embedding(message)
-    
-    @bot.message_handler(commands=['citizens'])
-    def citizens(message): cmd_citizens(message)
-    
-    @bot.message_handler(commands=['offers'])
-    def offers(message): cmd_offers(message)
-    
-    @bot.message_handler(commands=['requests'])
-    def requests(message): cmd_requests(message)
-    
-    @bot.message_handler(commands=['my_offers'])
-    def my_offers(message): cmd_my_offers(message)
-    
-    @bot.message_handler(commands=['my_requests'])
-    def my_requests(message): cmd_my_requests(message)
-    
-    @bot.message_handler(commands=['marketplace'])
-    def marketplace(message): cmd_marketplace(message)
-    
-    @bot.message_handler(commands=['help'])
-    def help(message): cmd_help(message)
-    
-    @bot.message_handler(commands=['survey'])
-    def survey(message): cmd_survey(message)
-    
-    @bot.message_handler(commands=['status'])
-    def status(message): cmd_status(message)
-    
-    @bot.message_handler(commands=['cancel'])
-    def cancel(message): cmd_cancel(message)
-    
-    @bot.message_handler(commands=['done'])
-    def done(message): cmd_done(message)
-    
-    @bot.message_handler(commands=['offer'])
-    def offer(message): cmd_offer(message)
-    
-    @bot.message_handler(commands=['request'])
-    def request(message): cmd_request(message)
-    
-    @bot.message_handler(commands=['language'])
-    def language(message): cmd_language(message)
-    
-    @bot.message_handler(commands=['subscribe'])
-    def subscribe(message): cmd_subscribe(message)
-    
-    @bot.message_handler(commands=['setkey'])
-    def setkey(message): cmd_setkey(message)
-    
-    @bot.message_handler(commands=['match'])
-    def match(message): cmd_match(message)
-    
-    @bot.message_handler(commands=['search'])
-    def search(message): cmd_search(message)
-    
-    @bot.message_handler(commands=['delete_offer'])
-    def delete_offer(message): cmd_delete_offer(message)
-    
-    @bot.message_handler(commands=['delete_request'])
-    def delete_request(message): cmd_delete_request(message)
-    
-    @bot.message_handler(commands=['support'])
-    def support(message): cmd_support(message)
+    # Register all handlers with explicit function references
+    bot.message_handler(commands=['start'])(cmd_start)
+    bot.message_handler(commands=['profile'])(cmd_profile)
+    bot.message_handler(commands=['embedding'])(cmd_embedding)
+    bot.message_handler(commands=['citizens'])(cmd_citizens)
+    bot.message_handler(commands=['offers'])(cmd_offers)
+    bot.message_handler(commands=['requests'])(cmd_requests)
+    bot.message_handler(commands=['my_offers'])(cmd_my_offers)
+    bot.message_handler(commands=['my_requests'])(cmd_my_requests)
+    bot.message_handler(commands=['marketplace'])(cmd_marketplace)
+    bot.message_handler(commands=['help'])(cmd_help)
+    bot.message_handler(commands=['survey'])(cmd_survey)
+    bot.message_handler(commands=['status'])(cmd_status)
+    bot.message_handler(commands=['cancel'])(cmd_cancel)
+    bot.message_handler(commands=['done'])(cmd_done)
+    bot.message_handler(commands=['offer'])(cmd_offer)
+    bot.message_handler(commands=['request'])(cmd_request)
+    bot.message_handler(commands=['language'])(cmd_language)
+    bot.message_handler(commands=['subscribe'])(cmd_subscribe)
+    bot.message_handler(commands=['setkey'])(cmd_setkey)
+    bot.message_handler(commands=['match'])(cmd_match)
+    bot.message_handler(commands=['search'])(cmd_search)
+    bot.message_handler(commands=['delete_offer'])(cmd_delete_offer)
+    bot.message_handler(commands=['delete_request'])(cmd_delete_request)
+    bot.message_handler(commands=['support'])(cmd_support)
     
     # Language selection handler
-    @bot.message_handler(func=lambda m: m.text in ["English", "Русский"])
-    def lang_selection(message): handle_language_selection(message)
+    bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
     # Survey state handler
-    @bot.message_handler(func=lambda m: True, content_types=['text'])
-    def survey_handler(message): handle_survey(message)
+    bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
+    
+    # Log handler should be registered AFTER commands but BEFORE survey
+    # Actually, it should be registered before to catch all
+    bot.message_handler(func=lambda m: True)(log_all_messages)
     
     logger.info("All handlers registered")
 
