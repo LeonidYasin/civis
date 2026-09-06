@@ -64,15 +64,15 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
-    # Users table
+    # Users table - renamed 'values' to 'user_values' to avoid SQL keyword
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             tg_id INTEGER PRIMARY KEY,
             username TEXT,
             name TEXT,
             telegram_contact TEXT,
-            text TEXT,
-            values TEXT,
+            about_text TEXT,
+            user_values TEXT,
             role TEXT,
             format TEXT,
             status TEXT DEFAULT 'registered',
@@ -103,7 +103,7 @@ def get_user(tg_id):
     row = cur.fetchone()
     conn.close()
     if row:
-        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'text', 'values', 'role', 'format', 'status', 'created_at', 'updated_at']
+        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'about_text', 'user_values', 'role', 'format', 'status', 'created_at', 'updated_at']
         return dict(zip(columns, row))
     return None
 
@@ -268,9 +268,9 @@ def cmd_profile(message: Message):
         f"Name: {user.get('name', 'N/A')}\n"
         f"Telegram: @{user.get('username', 'N/A')}\n"
         f"Role: {user.get('role', 'N/A')}\n"
-        f"Values: {user.get('values', 'N/A')}\n"
+        f"Values: {user.get('user_values', 'N/A')}\n"
         f"Format: {user.get('format', 'N/A')}\n\n"
-        f"About:\n{user.get('text', 'N/A')}"
+        f"About:\n{user.get('about_text', 'N/A')}"
     )
     bot.reply_to(message, profile_text)
 
@@ -386,7 +386,7 @@ def handle_survey(message: Message):
                 "Take your time and tell me about yourself."
             )
             return
-        data['text'] = text
+        data['about_text'] = text
         set_session(tg_id, 'survey_values', data)
         bot.reply_to(
             message,
@@ -410,7 +410,7 @@ def handle_survey(message: Message):
             )
             return
         
-        data['values'] = ', '.join(selected)
+        data['user_values'] = ', '.join(selected)
         set_session(tg_id, 'survey_role', data)
         bot.reply_to(
             message,
@@ -459,8 +459,8 @@ def handle_survey(message: Message):
                 username=username,
                 name=data.get('name', ''),
                 telegram_contact=f"@{username}",
-                text=data.get('text', ''),
-                values=data.get('values', ''),
+                about_text=data.get('about_text', ''),
+                user_values=data.get('user_values', ''),
                 role=data.get('role', ''),
                 format=data.get('format', ''),
                 status='completed'
@@ -475,7 +475,7 @@ def handle_survey(message: Message):
                 "You are now a citizen of Civis! 🏛️\n\n"
                 f"Your profile:\n"
                 f"Role: {data['role']}\n"
-                f"Values: {data['values']}\n"
+                f"Values: {data['user_values']}\n"
                 f"Format: {data['format']}\n\n"
                 "We'll match you with projects and teams soon.\n"
                 "Use /profile to view or /survey to update.",
