@@ -7,15 +7,13 @@ import logging
 
 from telebot.types import Message, ReplyKeyboardRemove
 
-from database import (
-    get_user, save_user, get_session, set_session, clear_session,
-    create_subscription, save_offer, save_request
-)
+from database import get_user, save_user, get_session, set_session, clear_session, create_subscription, save_offer, save_request
 from locales import TEXTS, VALUE_MAP
 from keyboards import (
     get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
 from utils import get_text
+from config import ADMIN_CHAT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +27,7 @@ def set_bot(bot_instance):
 # --- SURVEY HANDLER ---
 
 def handle_survey(message: Message):
-    """Handle survey states and support messages"""
+    """Handle survey states"""
     if bot is None:
         logger.error("Bot not set in survey.py!")
         return
@@ -41,35 +39,33 @@ def handle_survey(message: Message):
         return
     
     state, data = get_session(tg_id)
+    
+    # --- SUPPORT MODE ---
+    if state == 'support':
+        # Forward message to admin
+        if ADMIN_CHAT_ID:
+            try:
+                bot.send_message(
+                    ADMIN_CHAT_ID,
+                    f"📩 Support message from user {tg_id} (@{message.from_user.username or 'unknown'}):\n\n{text}"
+                )
+                bot.reply_to(message, get_text(tg_id, 'support_sent'), reply_markup=get_main_keyboard(get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'))
+            except Exception as e:
+                logger.error(f"Support forward error: {e}")
+                bot.reply_to(message, get_text(tg_id, 'support_error'))
+        else:
+            logger.info(f"Support message from {tg_id}: {text}")
+            bot.reply_to(message, get_text(tg_id, 'support_sent'))
+        
+        clear_session(tg_id)
+        return
+    
     if not state:
         lang = get_user(tg_id).get('language', 'en') if get_user(tg_id) else 'en'
         bot.reply_to(message, get_text(tg_id, 'unknown'), reply_markup=get_main_keyboard(lang))
         return
     
     lang = data.get('language', 'en')
-    
-    # --- SUPPORT MODE ---
-    if state == 'support':
-        # Forward message to developer (hardcoded chat ID for now)
-        # In production, this should be configurable
-        developer_chat_id = 521254540  # Your chat ID
-        try:
-            # Forward to developer
-            bot.send_message(
-                developer_chat_id,
-                f"📩 Support message from user {tg_id} (@{message.from_user.username}):\n\n{text}"
-            )
-            # Also send a copy to the user
-            bot.send_message(
-                tg_id,
-                get_text(tg_id, 'support_sent'),
-                reply_markup=get_main_keyboard(lang)
-            )
-            clear_session(tg_id)
-        except Exception as e:
-            logger.error(f"Support forward error: {e}")
-            bot.reply_to(message, get_text(tg_id, 'support_error'))
-        return
     
     # --- BACK BUTTON HANDLING ---
     if text == "/back" or text == "Назад" or text == "Back":
