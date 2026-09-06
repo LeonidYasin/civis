@@ -47,6 +47,7 @@ def register_handlers():
         raise RuntimeError("Bot not set. Call set_bot() first.")
     
     # === LOG ALL MESSAGES (MUST NOT BLOCK) ===
+    # IMPORTANT: this handler must return True to let other handlers process
     def log_all_messages(message: Message):
         tg_id = message.from_user.id
         username = message.from_user.username or "unknown"
@@ -56,10 +57,10 @@ def register_handlers():
         logger.info(f"[ALL] msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
         if chat_type in ['group', 'supergroup']:
             logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
-        # IMPORTANT: do NOT return anything — let other handlers process the message
+        # Return True to continue processing to other handlers
+        return True
     
-    # Register logger FIRST with a filter that always returns True
-    # This allows the message to continue to other handlers
+    # Register logger FIRST — it must return True
     bot.message_handler(func=lambda m: True, content_types=['text'])(log_all_messages)
     
     # === COMMAND HANDLERS ===
@@ -91,7 +92,7 @@ def register_handlers():
     # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages — MUST be last)
+    # Survey state handler (catch-all for text messages)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
