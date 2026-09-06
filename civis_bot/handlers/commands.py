@@ -4,11 +4,9 @@ Command handlers for Civis bot.
 """
 
 import logging
-import json
 import sqlite3
-from datetime import datetime
 
-from telebot.types import Message, BotCommand
+from telebot.types import Message
 
 from database import (
     get_user, save_user, get_session, set_session, clear_session,
@@ -19,23 +17,27 @@ from database import (
     can_use_match, get_matches_remaining, increment_matches_used,
     get_openai_key, save_openai_key, search_citizens, DB_PATH
 )
-from locales import TEXTS, VALUE_MAP
+from locales import TEXTS
 from keyboards import (
     get_main_keyboard, get_language_keyboard,
     get_values_keyboard, get_roles_keyboard, get_formats_keyboard
 )
 from utils import get_text, get_embedding_profile
 from config import get_proxy_url
-from .survey import handle_survey, handle_language_selection
+
+from .survey import handle_survey
+from .language import handle_language_selection
 
 logger = logging.getLogger(__name__)
 
-# Global bot reference
+# Global bot reference (set in bot.py)
 bot = None
 
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
+
+# --- REGISTRATION ---
 
 def register_handlers():
     """Register all command handlers with the bot"""
@@ -207,6 +209,7 @@ def cmd_my_requests(message: Message):
     bot.reply_to(message, text)
 
 def cmd_delete_offer(message: Message):
+    """Delete an offer by ID"""
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -230,6 +233,7 @@ def cmd_delete_offer(message: Message):
         bot.reply_to(message, f"❌ Offer #{offer_id} not found or you don't have permission to delete it.")
 
 def cmd_delete_request(message: Message):
+    """Delete a request by ID"""
     tg_id = message.from_user.id
     parts = message.text.split()
     if len(parts) < 2:
@@ -380,6 +384,7 @@ def cmd_language(message: Message):
     )
 
 def cmd_subscribe(message: Message):
+    """Show subscription plans"""
     tg_id = message.from_user.id
     
     user = get_user(tg_id)
@@ -425,6 +430,7 @@ To upgrade, send /setkey to use your own OpenAI key, or contact @civis_support f
     bot.reply_to(message, text, parse_mode='Markdown')
 
 def cmd_setkey(message: Message):
+    """Set OpenAI API key"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -450,6 +456,7 @@ def cmd_setkey(message: Message):
     bot.reply_to(message, "✅ OpenAI key saved successfully! You can now use /match for AI-powered matching.")
 
 def cmd_match(message: Message):
+    """AI-powered matching"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -505,6 +512,7 @@ About: {user.get('about_text', 'N/A')}"""
     )
 
 def cmd_search(message: Message):
+    """Search citizens by name, role, or values"""
     tg_id = message.from_user.id
     user = get_user(tg_id)
     if not user or user.get('status') != 'completed':
@@ -537,6 +545,7 @@ def cmd_search(message: Message):
     bot.reply_to(message, text)
 
 def get_user_by_username(username):
+    """Helper to get user by username"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT tg_id FROM users WHERE username = ?", (username,))
