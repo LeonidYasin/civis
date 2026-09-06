@@ -55,41 +55,93 @@ def init_db():
         )
     """)
     
-    # Offers table with category
+    # Offers table with category and extended fields
     cur.execute("""
         CREATE TABLE IF NOT EXISTS offers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tg_id INTEGER,
             category TEXT DEFAULT 'general',
             text TEXT,
+            price INTEGER,
+            property_type TEXT,
+            property_area INTEGER,
+            property_address TEXT,
+            property_rooms INTEGER,
             created_at TEXT
         )
     """)
     
-    # Check if category column exists in offers
+    # Check for missing columns in offers
     cur.execute("PRAGMA table_info(offers)")
     offer_columns = [col[1] for col in cur.fetchall()]
     if 'category' not in offer_columns:
         cur.execute("ALTER TABLE offers ADD COLUMN category TEXT DEFAULT 'general'")
         logger.info("Added 'category' column to offers table")
+    if 'price' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN price INTEGER")
+        logger.info("Added 'price' column to offers table")
+    if 'property_type' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN property_type TEXT")
+        logger.info("Added 'property_type' column to offers table")
+    if 'property_area' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN property_area INTEGER")
+        logger.info("Added 'property_area' column to offers table")
+    if 'property_address' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN property_address TEXT")
+        logger.info("Added 'property_address' column to offers table")
+    if 'property_rooms' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN property_rooms INTEGER")
+        logger.info("Added 'property_rooms' column to offers table")
     
-    # Requests table with category
+    # Requests table with category and extended fields
     cur.execute("""
         CREATE TABLE IF NOT EXISTS requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tg_id INTEGER,
             category TEXT DEFAULT 'general',
             text TEXT,
+            price_min INTEGER,
+            price_max INTEGER,
+            property_type TEXT,
+            property_area_min INTEGER,
+            property_area_max INTEGER,
+            property_address TEXT,
+            property_rooms_min INTEGER,
+            property_rooms_max INTEGER,
             created_at TEXT
         )
     """)
     
-    # Check if category column exists in requests
+    # Check for missing columns in requests
     cur.execute("PRAGMA table_info(requests)")
     req_columns = [col[1] for col in cur.fetchall()]
     if 'category' not in req_columns:
         cur.execute("ALTER TABLE requests ADD COLUMN category TEXT DEFAULT 'general'")
         logger.info("Added 'category' column to requests table")
+    if 'price_min' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN price_min INTEGER")
+        logger.info("Added 'price_min' column to requests table")
+    if 'price_max' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN price_max INTEGER")
+        logger.info("Added 'price_max' column to requests table")
+    if 'property_type' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_type TEXT")
+        logger.info("Added 'property_type' column to requests table")
+    if 'property_area_min' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_area_min INTEGER")
+        logger.info("Added 'property_area_min' column to requests table")
+    if 'property_area_max' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_area_max INTEGER")
+        logger.info("Added 'property_area_max' column to requests table")
+    if 'property_address' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_address TEXT")
+        logger.info("Added 'property_address' column to requests table")
+    if 'property_rooms_min' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_rooms_min INTEGER")
+        logger.info("Added 'property_rooms_min' column to requests table")
+    if 'property_rooms_max' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN property_rooms_max INTEGER")
+        logger.info("Added 'property_rooms_max' column to requests table")
     
     # Subscriptions table
     cur.execute("""
@@ -100,6 +152,16 @@ def init_db():
             matches_used INTEGER DEFAULT 0,
             matches_limit INTEGER DEFAULT 3,
             created_at TEXT,
+            updated_at TEXT
+        )
+    """)
+    
+    # Embeddings cache table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS embeddings (
+            tg_id INTEGER PRIMARY KEY,
+            embedding TEXT,
+            provider TEXT,
             updated_at TEXT
         )
     """)
@@ -192,11 +254,24 @@ def clear_session(tg_id):
     conn.close()
 
 # --- OFFER FUNCTIONS ---
-def save_offer(tg_id, text, category='general'):
+def save_offer(tg_id, text, category='general', **kwargs):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("INSERT INTO offers (tg_id, category, text, created_at) VALUES (?, ?, ?, ?)",
-                 (tg_id, category, text, datetime.now().isoformat()))
+    
+    # Build insert query dynamically
+    fields = ['tg_id', 'category', 'text', 'created_at']
+    values = [tg_id, category, text, datetime.now().isoformat()]
+    
+    # Add optional fields
+    optional_fields = ['price', 'property_type', 'property_area', 'property_address', 'property_rooms']
+    for field in optional_fields:
+        if field in kwargs and kwargs[field] is not None:
+            fields.append(field)
+            values.append(kwargs[field])
+    
+    placeholders = ', '.join(['?'] * len(values))
+    cur.execute(f"INSERT INTO offers ({', '.join(fields)}) VALUES ({placeholders})", values)
+    
     conn.commit()
     conn.close()
 
@@ -204,9 +279,15 @@ def get_all_offers(category=None):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     if category:
-        cur.execute("SELECT id, tg_id, category, text, created_at FROM offers WHERE category = ? ORDER BY created_at DESC", (category,))
+        cur.execute("""
+            SELECT id, tg_id, category, text, price, property_type, property_area, property_address, property_rooms, created_at
+            FROM offers WHERE category = ? ORDER BY created_at DESC
+        """, (category,))
     else:
-        cur.execute("SELECT id, tg_id, category, text, created_at FROM offers ORDER BY created_at DESC")
+        cur.execute("""
+            SELECT id, tg_id, category, text, price, property_type, property_area, property_address, property_rooms, created_at
+            FROM offers ORDER BY created_at DESC
+        """)
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -214,7 +295,10 @@ def get_all_offers(category=None):
 def get_my_offers(tg_id):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, category, text, created_at FROM offers WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    cur.execute("""
+        SELECT id, category, text, price, property_type, property_area, property_address, property_rooms, created_at
+        FROM offers WHERE tg_id = ? ORDER BY created_at DESC
+    """, (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -229,11 +313,25 @@ def delete_offer(offer_id, tg_id):
     return affected > 0
 
 # --- REQUEST FUNCTIONS ---
-def save_request(tg_id, text, category='general'):
+def save_request(tg_id, text, category='general', **kwargs):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("INSERT INTO requests (tg_id, category, text, created_at) VALUES (?, ?, ?, ?)",
-                 (tg_id, category, text, datetime.now().isoformat()))
+    
+    # Build insert query dynamically
+    fields = ['tg_id', 'category', 'text', 'created_at']
+    values = [tg_id, category, text, datetime.now().isoformat()]
+    
+    # Add optional fields
+    optional_fields = ['price_min', 'price_max', 'property_type', 'property_area_min', 
+                      'property_area_max', 'property_address', 'property_rooms_min', 'property_rooms_max']
+    for field in optional_fields:
+        if field in kwargs and kwargs[field] is not None:
+            fields.append(field)
+            values.append(kwargs[field])
+    
+    placeholders = ', '.join(['?'] * len(values))
+    cur.execute(f"INSERT INTO requests ({', '.join(fields)}) VALUES ({placeholders})", values)
+    
     conn.commit()
     conn.close()
 
@@ -241,9 +339,19 @@ def get_all_requests(category=None):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     if category:
-        cur.execute("SELECT id, tg_id, category, text, created_at FROM requests WHERE category = ? ORDER BY created_at DESC", (category,))
+        cur.execute("""
+            SELECT id, tg_id, category, text, price_min, price_max, property_type,
+                   property_area_min, property_area_max, property_address,
+                   property_rooms_min, property_rooms_max, created_at
+            FROM requests WHERE category = ? ORDER BY created_at DESC
+        """, (category,))
     else:
-        cur.execute("SELECT id, tg_id, category, text, created_at FROM requests ORDER BY created_at DESC")
+        cur.execute("""
+            SELECT id, tg_id, category, text, price_min, price_max, property_type,
+                   property_area_min, property_area_max, property_address,
+                   property_rooms_min, property_rooms_max, created_at
+            FROM requests ORDER BY created_at DESC
+        """)
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -251,7 +359,12 @@ def get_all_requests(category=None):
 def get_my_requests(tg_id):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT id, category, text, created_at FROM requests WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    cur.execute("""
+        SELECT id, category, text, price_min, price_max, property_type,
+               property_area_min, property_area_max, property_address,
+               property_rooms_min, property_rooms_max, created_at
+        FROM requests WHERE tg_id = ? ORDER BY created_at DESC
+    """, (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
@@ -264,6 +377,158 @@ def delete_request(req_id, tg_id):
     conn.commit()
     conn.close()
     return affected > 0
+
+def find_matching_offers_for_request(req_tg_id, limit=10):
+    """Find offers that match a request using AI embeddings"""
+    # Get the request
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, category, text, price_min, price_max, property_type,
+               property_area_min, property_area_max, property_address,
+               property_rooms_min, property_rooms_max
+        FROM requests WHERE tg_id = ? AND category = 'real_estate'
+    """, (req_tg_id,))
+    req = cur.fetchone()
+    conn.close()
+    
+    if not req:
+        return []
+    
+    # Get all real estate offers
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, tg_id, text, price, property_type, property_area, property_address, property_rooms
+        FROM offers WHERE category = 'real_estate'
+    """)
+    offers = cur.fetchall()
+    conn.close()
+    
+    if not offers:
+        return []
+    
+    # Simple rule-based matching (will be enhanced with AI later)
+    matches = []
+    req_price_min = req[3] or 0
+    req_price_max = req[4] or float('inf')
+    req_type = req[5]
+    req_area_min = req[6] or 0
+    req_area_max = req[7] or float('inf')
+    req_rooms_min = req[9] or 0
+    req_rooms_max = req[10] or float('inf')
+    
+    for offer in offers:
+        offer_id, tg_id, text, price, prop_type, area, address, rooms = offer
+        
+        # Check price range
+        if price and (price < req_price_min or price > req_price_max):
+            continue
+        
+        # Check property type
+        if req_type and prop_type and req_type.lower() != prop_type.lower():
+            continue
+        
+        # Check area range
+        if area and (area < req_area_min or area > req_area_max):
+            continue
+        
+        # Check rooms range
+        if rooms and (rooms < req_rooms_min or rooms > req_rooms_max):
+            continue
+        
+        matches.append({
+            'offer_id': offer_id,
+            'tg_id': tg_id,
+            'text': text,
+            'price': price,
+            'property_type': prop_type,
+            'area': area,
+            'address': address,
+            'rooms': rooms
+        })
+    
+    return matches[:limit]
+
+def find_matching_requests_for_offer(offer_tg_id, limit=10):
+    """Find requests that match an offer using AI embeddings"""
+    # Get the offer
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, category, text, price, property_type, property_area, property_address, property_rooms
+        FROM offers WHERE tg_id = ? AND category = 'real_estate'
+    """, (offer_tg_id,))
+    offer = cur.fetchone()
+    conn.close()
+    
+    if not offer:
+        return []
+    
+    # Get all real estate requests
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, tg_id, text, price_min, price_max, property_type,
+               property_area_min, property_area_max, property_address,
+               property_rooms_min, property_rooms_max
+        FROM requests WHERE category = 'real_estate'
+    """)
+    requests = cur.fetchall()
+    conn.close()
+    
+    if not requests:
+        return []
+    
+    # Simple rule-based matching
+    matches = []
+    offer_price = offer[3]
+    offer_type = offer[4]
+    offer_area = offer[5]
+    offer_rooms = offer[7]
+    
+    for req in requests:
+        req_id, tg_id, text, price_min, price_max, req_type, area_min, area_max, address, rooms_min, rooms_max = req
+        
+        # Check price range
+        if offer_price:
+            if price_min and offer_price < price_min:
+                continue
+            if price_max and offer_price > price_max:
+                continue
+        
+        # Check property type
+        if req_type and offer_type and req_type.lower() != offer_type.lower():
+            continue
+        
+        # Check area range
+        if offer_area:
+            if area_min and offer_area < area_min:
+                continue
+            if area_max and offer_area > area_max:
+                continue
+        
+        # Check rooms range
+        if offer_rooms:
+            if rooms_min and offer_rooms < rooms_min:
+                continue
+            if rooms_max and offer_rooms > rooms_max:
+                continue
+        
+        matches.append({
+            'request_id': req_id,
+            'tg_id': tg_id,
+            'text': text,
+            'price_min': price_min,
+            'price_max': price_max,
+            'property_type': req_type,
+            'area_min': area_min,
+            'area_max': area_max,
+            'rooms_min': rooms_min,
+            'rooms_max': rooms_max
+        })
+    
+    return matches[:limit]
 
 # --- CITIZEN FUNCTIONS ---
 def get_all_citizens():
