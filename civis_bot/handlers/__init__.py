@@ -41,8 +41,10 @@ logger = logging.getLogger(__name__)
 
 def register_handlers():
     """Register all command handlers with the bot"""
+    # Check if bot is set
     if bot is None:
-        raise RuntimeError("Bot not set. Call set_bot() first.")
+        logger.error("Bot not set! Make sure set_bot() is called before register_handlers()")
+        return
     
     # Core commands
     bot.message_handler(commands=['start'])(cmd_start)
