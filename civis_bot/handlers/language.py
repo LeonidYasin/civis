@@ -12,27 +12,40 @@ from locales import TEXTS
 from keyboards import get_main_keyboard, get_language_keyboard
 from utils import get_text
 
+from .helpers import get_bot
+
 logger = logging.getLogger(__name__)
 
-# Global bot reference (set from commands)
-bot = None
-
-def set_bot(bot_instance):
-    global bot
-    bot = bot_instance
+def get_bot_safe():
+    """Get bot instance safely"""
+    bot = get_bot()
+    if bot is None:
+        logger.error("Bot not set in language.py!")
+        raise RuntimeError("Bot not set")
+    return bot
 
 # --- LANGUAGE SELECTION ---
 
 def handle_language_selection(message: Message):
     """Handle language selection"""
-    if bot is None:
-        logger.error("Bot not set in language.py!")
+    try:
+        bot = get_bot_safe()
+    except RuntimeError:
         return
     
     tg_id = message.from_user.id
-    text = message.text
+    text = message.text.strip()
     
-    lang = 'en' if text == "English" else 'ru'
+    # Check if text is exactly "English" or "Русский" (case-insensitive, trimmed)
+    if text.lower() == "english":
+        lang = 'en'
+    elif text.lower() == "русский" or text == "Русский":
+        lang = 'ru'
+    else:
+        # Not a language selection message
+        return
+    
+    logger.info(f"Language selected: {lang} for user {tg_id}")
     
     user = get_user(tg_id)
     if user:
