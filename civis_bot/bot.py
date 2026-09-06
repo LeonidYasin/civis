@@ -17,7 +17,6 @@ from telebot.types import BotCommand, CallbackQuery
 from config import TOKEN, get_proxy_url
 from database import init_db
 from handlers import register_handlers, set_bot
-from keyboards import get_inline_main_keyboard
 
 # --- LOGGING ---
 # Force UTF-8 encoding for Windows console
@@ -77,7 +76,6 @@ set_bot(bot)
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call: CallbackQuery):
     """Handle inline keyboard button clicks — execute command immediately"""
-    tg_id = call.from_user.id
     data = call.data
     
     # Map callback data to commands
@@ -100,6 +98,9 @@ def handle_callback(call: CallbackQuery):
         'language': '/language',
         'start': '/start',
         'menu': '/menu',
+        'offer_real_estate': '/offer_real_estate',
+        'offer_taxi': '/offer_taxi',
+        'offer_delivery': '/offer_delivery',
     }
     
     if data not in command_map:
@@ -128,8 +129,6 @@ def handle_callback(call: CallbackQuery):
     
     # Process the command using bot's message handler
     try:
-        # We need to simulate a new message to trigger the command handler
-        # The simplest way: use bot.process_new_messages
         bot.process_new_messages([fake_msg])
     except Exception as e:
         logger.error(f"Error processing callback command {cmd}: {e}")
