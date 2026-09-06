@@ -16,45 +16,45 @@ def get_language_keyboard():
     return keyboard
 
 def get_main_keyboard(lang='en'):
-    """Main menu - 2 columns"""
+    """Main menu - 2 columns with support button"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
-    # Row 1
+    # Row 1: Create
     keyboard.row(
         KeyboardButton("/offer"),
         KeyboardButton("/request")
     )
-    # Row 2
+    # Row 2: View own
     keyboard.row(
         KeyboardButton("/my_offers"),
         KeyboardButton("/my_requests")
     )
-    # Row 3
+    # Row 3: Delete
     keyboard.row(
         KeyboardButton("/delete_offer"),
         KeyboardButton("/delete_request")
     )
-    # Row 4
+    # Row 4: Marketplace & Profile
     keyboard.row(
         KeyboardButton("/marketplace"),
         KeyboardButton("/profile")
     )
-    # Row 5
+    # Row 5: Embedding & Citizens
     keyboard.row(
         KeyboardButton("/embedding"),
         KeyboardButton("/citizens")
     )
-    # Row 6
+    # Row 6: Subscribe & Match
     keyboard.row(
         KeyboardButton("/subscribe"),
         KeyboardButton("/match")
     )
-    # Row 7
+    # Row 7: Search & Help
     keyboard.row(
         KeyboardButton("/search"),
         KeyboardButton("/help")
     )
-    # Row 8
+    # Row 8: Support (full width)
     keyboard.row(
         KeyboardButton("/support")
     )
