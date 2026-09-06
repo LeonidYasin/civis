@@ -24,37 +24,42 @@ def get_main_keyboard(lang='en'):
         KeyboardButton("/offer"),
         KeyboardButton("/request")
     )
-    # Row 2: View own
+    # Row 2: Real Estate
+    keyboard.row(
+        KeyboardButton("/offer_real_estate"),
+        KeyboardButton("/request_real_estate")
+    )
+    # Row 3: View own
     keyboard.row(
         KeyboardButton("/my_offers"),
         KeyboardButton("/my_requests")
     )
-    # Row 3: Delete
+    # Row 4: Delete
     keyboard.row(
         KeyboardButton("/delete_offer"),
         KeyboardButton("/delete_request")
     )
-    # Row 4: Marketplace & Profile
+    # Row 5: Marketplace & Profile
     keyboard.row(
         KeyboardButton("/marketplace"),
         KeyboardButton("/profile")
     )
-    # Row 5: Embedding & Citizens
+    # Row 6: Embedding & Citizens
     keyboard.row(
         KeyboardButton("/embedding"),
         KeyboardButton("/citizens")
     )
-    # Row 6: Subscribe & Match
+    # Row 7: Subscribe & Match
     keyboard.row(
         KeyboardButton("/subscribe"),
         KeyboardButton("/match")
     )
-    # Row 7: Search & Help
+    # Row 8: Search & Help
     keyboard.row(
         KeyboardButton("/search"),
         KeyboardButton("/help")
     )
-    # Row 8: Support (full width)
+    # Row 9: Support (full width)
     keyboard.row(
         KeyboardButton("/support")
     )
@@ -68,33 +73,68 @@ def get_category_keyboard(lang='en'):
     if lang == 'ru':
         keyboard.row(
             KeyboardButton("Общее"),
-            KeyboardButton("Такси")
+            KeyboardButton("Недвижимость")
         )
         keyboard.row(
-            KeyboardButton("Доставка"),
-            KeyboardButton("Услуги")
+            KeyboardButton("Такси"),
+            KeyboardButton("Доставка")
         )
         keyboard.row(
-            KeyboardButton("Товары"),
-            KeyboardButton("Другое")
+            KeyboardButton("Услуги"),
+            KeyboardButton("Товары")
         )
         keyboard.row(
+            KeyboardButton("Другое"),
             KeyboardButton("/cancel")
         )
     else:
         keyboard.row(
             KeyboardButton("General"),
-            KeyboardButton("Taxi")
+            KeyboardButton("Real Estate")
         )
         keyboard.row(
-            KeyboardButton("Delivery"),
-            KeyboardButton("Services")
+            KeyboardButton("Taxi"),
+            KeyboardButton("Delivery")
         )
         keyboard.row(
-            KeyboardButton("Goods"),
-            KeyboardButton("Other")
+            KeyboardButton("Services"),
+            KeyboardButton("Goods")
         )
         keyboard.row(
+            KeyboardButton("Other"),
+            KeyboardButton("/cancel")
+        )
+    
+    return keyboard
+
+def get_property_type_keyboard(lang='en'):
+    """Property type selection - 2 columns"""
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+    
+    if lang == 'ru':
+        keyboard.row(
+            KeyboardButton("Квартира"),
+            KeyboardButton("Дом")
+        )
+        keyboard.row(
+            KeyboardButton("Коммерческая"),
+            KeyboardButton("Земельный участок")
+        )
+        keyboard.row(
+            KeyboardButton("Любой"),
+            KeyboardButton("/cancel")
+        )
+    else:
+        keyboard.row(
+            KeyboardButton("Apartment"),
+            KeyboardButton("House")
+        )
+        keyboard.row(
+            KeyboardButton("Commercial"),
+            KeyboardButton("Land")
+        )
+        keyboard.row(
+            KeyboardButton("Any"),
             KeyboardButton("/cancel")
         )
     
