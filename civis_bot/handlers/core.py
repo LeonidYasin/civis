@@ -24,13 +24,14 @@ from keyboards import (
 from utils import get_text, get_embedding_profile
 from config import get_proxy_url
 
-from .helpers import log_message, bot
+from .helpers import log_message, get_bot
 
 logger = logging.getLogger(__name__)
 
 # --- COMMAND HANDLERS ---
 
 def cmd_start(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     logger.info(f"Received /start from {tg_id}")
@@ -53,7 +54,8 @@ def cmd_start(message: Message):
     )
 
 def cmd_menu(message: Message):
-    """Show full main menu with all commands"""
+    """Show full main menu with all commands as inline buttons"""
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -63,58 +65,59 @@ def cmd_menu(message: Message):
     
     lang = user.get('language', 'en')
     
-    # Full command list - clean text without emojis in command list
+    # Full command list
     text = "📋 **Civis Bot — Full Menu**\n\n"
     text += "**Profile & Account**\n"
-    text += "/start — Create or view your profile\n"
-    text += "/profile — View your profile\n"
-    text += "/survey — Update your profile\n"
-    text += "/embedding — View AI embedding profile\n\n"
+    text += "`/start` — Create or view your profile\n"
+    text += "`/profile` — View your profile\n"
+    text += "`/survey` — Update your profile\n"
+    text += "`/embedding` — View AI embedding profile\n\n"
     
     text += "**Marketplace**\n"
-    text += "/offer — Publish an offer (with category)\n"
-    text += "/offer_real_estate — Quick real estate offer\n"
-    text += "/offer_taxi — Quick taxi offer\n"
-    text += "/offer_delivery — Quick delivery offer\n"
-    text += "/request — Publish a request\n"
-    text += "/my_offers — View your offers\n"
-    text += "/my_requests — View your requests\n"
-    text += "/delete_offer <id> — Delete your offer\n"
-    text += "/delete_request <id> — Delete your request\n"
-    text += "/marketplace — View marketplace\n"
-    text += "/offers — View all offers\n"
-    text += "/requests — View all requests\n\n"
+    text += "`/offer` — Publish an offer (with category)\n"
+    text += "`/offer_real_estate` — Quick real estate offer\n"
+    text += "`/offer_taxi` — Quick taxi offer\n"
+    text += "`/offer_delivery` — Quick delivery offer\n"
+    text += "`/request` — Publish a request\n"
+    text += "`/my_offers` — View your offers\n"
+    text += "`/my_requests` — View your requests\n"
+    text += "`/delete_offer <id>` — Delete your offer\n"
+    text += "`/delete_request <id>` — Delete your request\n"
+    text += "`/marketplace` — View marketplace\n"
+    text += "`/offers` — View all offers\n"
+    text += "`/requests` — View all requests\n\n"
     
     text += "**People & Search**\n"
-    text += "/citizens — List all citizens\n"
-    text += "/search <text> — Search citizens\n"
-    text += "/match — AI-powered matching\n\n"
+    text += "`/citizens` — List all citizens\n"
+    text += "`/search <text>` — Search citizens\n"
+    text += "`/match` — AI-powered matching\n\n"
     
     text += "**Subscriptions & AI**\n"
-    text += "/subscribe — View subscription plans\n"
-    text += "/setkey <key> — Set OpenAI API key\n"
-    text += "/upload_dialog — Upload dialog history\n"
-    text += "/my_dialogs — List uploaded dialogs\n"
-    text += "/process_dialogs — Process dialogs\n\n"
+    text += "`/subscribe` — View subscription plans\n"
+    text += "`/setkey <key>` — Set OpenAI API key\n"
+    text += "`/upload_dialog` — Upload dialog history\n"
+    text += "`/my_dialogs` — List uploaded dialogs\n"
+    text += "`/process_dialogs` — Process dialogs\n\n"
     
     text += "**Settings & Help**\n"
-    text += "/language — Change language\n"
-    text += "/support — Contact developer\n"
-    text += "/status — Bot status\n"
-    text += "/help — Help\n"
-    text += "/cancel — Cancel current operation\n"
-    text += "/done — Finish value selection\n"
+    text += "`/language` — Change language\n"
+    text += "`/support` — Contact developer\n"
+    text += "`/status` — Bot status\n"
+    text += "`/help` — Help\n"
+    text += "`/cancel` — Cancel current operation\n"
+    text += "`/done` — Finish value selection\n"
     
-    # Use inline keyboard for interactive menu (without emojis in buttons)
+    # Use inline keyboard for interactive menu (buttons execute immediately)
     bot.reply_to(
         message,
         text,
         parse_mode='Markdown',
-        reply_markup=get_inline_main_keyboard(lang, with_icons=False)
+        reply_markup=get_inline_main_keyboard(lang)
     )
 
 def cmd_reload(message: Message):
     """Reload the bot (admin only)"""
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     
@@ -137,6 +140,7 @@ def cmd_reload(message: Message):
         bot.reply_to(message, f"❌ Reload error: {e}")
 
 def cmd_profile(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -157,6 +161,7 @@ def cmd_profile(message: Message):
     bot.reply_to(message, profile_text)
 
 def cmd_embedding(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -172,6 +177,7 @@ def cmd_embedding(message: Message):
     )
 
 def cmd_citizens(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     rows = get_all_citizens()
@@ -185,10 +191,12 @@ def cmd_citizens(message: Message):
     bot.reply_to(message, text)
 
 def cmd_help(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     bot.reply_to(message, get_text(message.from_user.id, 'help'))
 
 def cmd_survey(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -197,6 +205,7 @@ def cmd_survey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'name_ask'), reply_markup=ReplyKeyboardRemove())
 
 def cmd_status(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     try:
@@ -222,12 +231,14 @@ def cmd_status(message: Message):
         bot.reply_to(message, f"Error: {e}")
 
 def cmd_cancel(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     clear_session(tg_id)
     bot.reply_to(message, get_text(tg_id, 'cancel'))
 
 def cmd_done(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     state, data = get_session(tg_id)
@@ -248,6 +259,7 @@ def cmd_done(message: Message):
     bot.reply_to(message, TEXTS[lang]['values_complete'] + "\n\n" + TEXTS[lang]['role_ask'], reply_markup=get_roles_keyboard(lang))
 
 def cmd_language(message: Message):
+    bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     logger.info(f"Received /language from {tg_id}")
