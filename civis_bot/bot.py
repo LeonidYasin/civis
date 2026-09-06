@@ -116,11 +116,12 @@ format_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ИНИЦИАЛИЗАЦИЯ БОТА С ПРОКСИ ---
-connector = get_proxy_connector()
-session = AiohttpSession(connector=connector)
-bot = Bot(token=TOKEN, session=session)
-dp = Dispatcher()
+# --- ИНИЦИАЛИЗАЦИЯ БОТА ---
+# Создаём бота внутри main(), чтобы коннектор создавался в event loop
+def create_bot():
+    connector = get_proxy_connector()
+    session = AiohttpSession(connector=connector)
+    return Bot(token=TOKEN, session=session)
 
 # --- ХЕНДЛЕРЫ ---
 @dp.message(Command("start"))
@@ -193,6 +194,18 @@ async def process_format(message: types.Message, state: FSMContext):
 # --- ЗАПУСК ---
 async def main():
     logging.basicConfig(level=logging.INFO)
+    
+    # Создаём бота внутри event loop
+    bot = create_bot()
+    dp = Dispatcher()
+    
+    # Регистрируем хендлеры
+    dp.message.register(start, Command("start"))
+    dp.message.register(process_text, Form.text)
+    dp.message.register(process_values, Form.values)
+    dp.message.register(process_role, Form.role)
+    dp.message.register(process_format, Form.format)
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
