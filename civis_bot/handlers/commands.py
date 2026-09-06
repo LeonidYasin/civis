@@ -20,10 +20,11 @@ from database import (
 from locales import TEXTS
 from keyboards import (
     get_main_keyboard, get_language_keyboard,
-    get_values_keyboard, get_roles_keyboard, get_formats_keyboard
+    get_values_keyboard, get_roles_keyboard, get_formats_keyboard,
+    get_category_keyboard
 )
-from utils import get_text, get_embedding_profile, find_matches, generate_match_explanation
-from config import get_proxy_url
+from utils import get_text, get_embedding_profile, find_matches, generate_match_explanation, get_profile_text
+from config import get_proxy_url, ADMIN_CHAT_ID
 
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection, set_bot as set_language_bot
@@ -82,10 +83,7 @@ def register_handlers():
     bot.message_handler(commands=['delete_request'])(cmd_delete_request)
     bot.message_handler(commands=['support'])(cmd_support)
     
-    # Language selection handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
-    
-    # Survey state handler
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
@@ -95,7 +93,6 @@ def register_handlers():
 def cmd_start(message: Message):
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
-    username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
     
     user = get_user(tg_id)
@@ -172,14 +169,15 @@ def cmd_offers(message: Message):
     
     text = "📦 All Offers:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, tg_id, offer_text, created_at = row
+        if len(row) == 5:
+            id, tg_id, category, offer_text, created_at = row
         else:
             tg_id, offer_text, created_at = row
             id = '?'
+            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} - @{name}: {offer_text}\n\n"
+        text += f"ID {id} [{category}] - @{name}: {offer_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_requests(message: Message):
@@ -191,14 +189,15 @@ def cmd_requests(message: Message):
     
     text = "📥 All Requests:\n\n"
     for row in rows:
-        if len(row) == 4:
-            id, tg_id, req_text, created_at = row
+        if len(row) == 5:
+            id, tg_id, category, req_text, created_at = row
         else:
             tg_id, req_text, created_at = row
             id = '?'
+            category = 'general'
         user = get_user(tg_id)
         name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} - @{name}: {req_text}\n\n"
+        text += f"ID {id} [{category}] - @{name}: {req_text}\n\n"
     bot.reply_to(message, text)
 
 def cmd_my_offers(message: Message):
@@ -210,8 +209,13 @@ def cmd_my_offers(message: Message):
         return
     
     text = "📦 Your Offers:\n\n"
-    for id, offer_text, created_at in rows:
-        text += f"ID {id}: {offer_text}\n"
+    for row in rows:
+        if len(row) == 4:
+            id, category, offer_text, created_at = row
+        else:
+            id, offer_text, created_at = row
+            category = 'general'
+        text += f"ID {id} [{category}]: {offer_text}\n"
         text += f"To delete: /delete_offer {id}\n\n"
     bot.reply_to(message, text)
 
@@ -224,8 +228,13 @@ def cmd_my_requests(message: Message):
         return
     
     text = "📥 Your Requests:\n\n"
-    for id, req_text, created_at in rows:
-        text += f"ID {id}: {req_text}\n"
+    for row in rows:
+        if len(row) == 4:
+            id, category, req_text, created_at = row
+        else:
+            id, req_text, created_at = row
+            category = 'general'
+        text += f"ID {id} [{category}]: {req_text}\n"
         text += f"To delete: /delete_request {id}\n\n"
     bot.reply_to(message, text)
 
@@ -287,28 +296,30 @@ def cmd_marketplace(message: Message):
     text += "📦 Offers:\n"
     if offers:
         for row in offers[:5]:
-            if len(row) == 4:
-                id, tg_id, offer_text, _ = row
+            if len(row) == 5:
+                id, tg_id, category, offer_text, _ = row
             else:
                 tg_id, offer_text, _ = row
                 id = '?'
+                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} {name}: {offer_text}\n"
+            text += f"  - #{id} [{category}] {name}: {offer_text}\n"
     else:
         text += "  (none)\n"
     
     text += "\n📥 Requests:\n"
     if requests:
         for row in requests[:5]:
-            if len(row) == 4:
-                id, tg_id, req_text, _ = row
+            if len(row) == 5:
+                id, tg_id, category, req_text, _ = row
             else:
                 tg_id, req_text, _ = row
                 id = '?'
+                category = 'general'
             user = get_user(tg_id)
             name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} {name}: {req_text}\n"
+            text += f"  - #{id} [{category}] {name}: {req_text}\n"
     else:
         text += "  (none)\n"
     
@@ -386,8 +397,13 @@ def cmd_offer(message: Message):
         return
     
     lang = user.get('language', 'en')
-    set_session(tg_id, 'offer', {'language': lang})
-    bot.reply_to(message, get_text(tg_id, 'offer_prompt'), reply_markup=ReplyKeyboardRemove())
+    # Ask for category first
+    set_session(tg_id, 'offer_category', {'language': lang})
+    bot.reply_to(
+        message,
+        "Select the category for your offer:\n\nChoose from the buttons below:",
+        reply_markup=get_category_keyboard(lang)
+    )
 
 def cmd_request(message: Message):
     log_message(message, "[CMD]")
@@ -398,8 +414,13 @@ def cmd_request(message: Message):
         return
     
     lang = user.get('language', 'en')
-    set_session(tg_id, 'request', {'language': lang})
-    bot.reply_to(message, get_text(tg_id, 'request_prompt'), reply_markup=ReplyKeyboardRemove())
+    # Ask for category first
+    set_session(tg_id, 'request_category', {'language': lang})
+    bot.reply_to(
+        message,
+        "Select the category for your request:\n\nChoose from the buttons below:",
+        reply_markup=get_category_keyboard(lang)
+    )
 
 def cmd_language(message: Message):
     log_message(message, "[CMD]")
@@ -471,7 +492,7 @@ def cmd_setkey(message: Message):
     bot.reply_to(message, get_text(tg_id, 'setkey_saved'))
 
 def cmd_match(message: Message):
-    """AI-powered matching with OpenAI or local fallback"""
+    """AI-powered matching with fallback to local model"""
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -479,8 +500,11 @@ def cmd_match(message: Message):
         bot.reply_to(message, get_text(tg_id, 'no_profile'))
         return
     
-    # Check subscription
-    if not can_use_match(tg_id):
+    # Get OpenAI key if available
+    openai_key = get_openai_key(tg_id)
+    
+    # Check subscription only if using OpenAI
+    if openai_key and not can_use_match(tg_id):
         remaining = get_matches_remaining(tg_id)
         bot.reply_to(
             message,
@@ -488,64 +512,57 @@ def cmd_match(message: Message):
         )
         return
     
-    # Check if OpenAI key is set or local model is available
-    openai_key = get_openai_key(tg_id)
+    # If using OpenAI, increment match count
+    if openai_key:
+        increment_matches_used(tg_id)
     
-    # Try to find matches
-    try:
-        matches = find_matches(tg_id, openai_key)
-    except Exception as e:
-        logger.error(f"Match error: {e}")
-        # Try with fallback if OpenAI failed
-        if openai_key:
-            logger.info("Retrying with local fallback...")
-            matches = find_matches(tg_id, None)
-        else:
-            bot.reply_to(
-                message,
-                "❌ Error during matching. Please try again later."
-            )
-            return
+    # Send "processing" message
+    status_msg = bot.reply_to(message, "🔍 Finding matches... This may take a moment.")
+    
+    # Find matches
+    matches = find_matches(tg_id, openai_key, limit=5)
     
     if matches is None:
-        bot.reply_to(
-            message,
-            "❌ Could not generate embedding. Please try again or set an OpenAI key via /setkey."
+        bot.edit_message_text(
+            "❌ Error generating your profile embedding. Please make sure you have a complete profile and try again.",
+            chat_id=message.chat.id,
+            message_id=status_msg.message_id
         )
         return
     
     if not matches:
-        bot.reply_to(
-            message,
-            "🔍 No matches found. Try updating your profile with more details!"
+        bot.edit_message_text(
+            "No matches found yet. Try updating your profile with more details, or come back later when more people join!",
+            chat_id=message.chat.id,
+            message_id=status_msg.message_id
         )
         return
     
-    # Increment matches used
-    increment_matches_used(tg_id)
-    
-    # Format results
+    # Build results
     lang = user.get('language', 'en')
+    text = f"🤝 **Your Top Matches**\n\n"
     
-    # Check which provider was used
-    provider = "OpenAI" if openai_key else "Local AI"
-    
-    text = f"🤝 **Your Top Matches** (via {provider})\n\n"
-    
-    for i, match in enumerate(matches[:5], 1):
-        text += f"{i}. @{match.get('username', 'unknown')} - {match.get('name', 'Unknown')}\n"
-        text += f"   Role: {match.get('role', 'N/A')}\n"
-        text += f"   Values: {match.get('values', 'N/A')}\n"
-        text += f"   Match score: {match.get('score', 0)}%\n"
-        # Add explanation
+    for i, match in enumerate(matches, 1):
         explanation = generate_match_explanation(user, match)
+        text += f"{i}. **@{match['username']}** - {match['name']}\n"
+        text += f"   Role: {match['role']}\n"
+        text += f"   Values: {match['values']}\n"
+        text += f"   Match score: {match['score']}%\n"
         text += f"   Why: {explanation}\n\n"
     
-    remaining = get_matches_remaining(tg_id)
-    remaining_text = str(remaining) if remaining != float('inf') else 'unlimited'
-    text += f"\n---\nMatches remaining: {remaining_text}"
+    # Show remaining matches
+    if openai_key:
+        remaining = get_matches_remaining(tg_id)
+        text += f"\n---\nMatches remaining: {remaining if remaining != float('inf') else 'unlimited'}"
+    else:
+        text += "\n---\nUsing local embedding model (no API key needed).\nSet /setkey for better quality matches."
     
-    bot.reply_to(message, text, parse_mode='Markdown')
+    bot.edit_message_text(
+        text,
+        chat_id=message.chat.id,
+        message_id=status_msg.message_id,
+        parse_mode='Markdown'
+    )
 
 def cmd_search(message: Message):
     log_message(message, "[CMD]")
@@ -567,7 +584,7 @@ def cmd_search(message: Message):
         bot.reply_to(message, f"No citizens found matching '{query}'.")
         return
     
-    text = f"🔍 Search results for '{query}':\n\n"
+    text = f"Search results for '{query}':\n\n"
     for username, name, role, values, about in results[:20]:
         text += f"@{username or 'unknown'} - {name}\n"
         text += f"Role: {role}\nValues: {values}\n"
