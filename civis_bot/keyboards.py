@@ -19,53 +19,133 @@ def get_language_keyboard():
     return keyboard
 
 def get_main_keyboard(lang='en'):
-    """Main menu - ReplyKeyboard for quick commands"""
+    """Main menu - ReplyKeyboard for quick commands (not full, just most used)"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
-    keyboard.row(
-        KeyboardButton("/offer"),
-        KeyboardButton("/request")
-    )
-    keyboard.row(
-        KeyboardButton("/my_offers"),
-        KeyboardButton("/my_requests")
-    )
-    keyboard.row(
-        KeyboardButton("/delete_offer"),
-        KeyboardButton("/delete_request")
-    )
-    keyboard.row(
-        KeyboardButton("/marketplace"),
-        KeyboardButton("/profile")
-    )
-    keyboard.row(
-        KeyboardButton("/embedding"),
-        KeyboardButton("/citizens")
-    )
-    keyboard.row(
-        KeyboardButton("/subscribe"),
-        KeyboardButton("/match")
-    )
-    keyboard.row(
-        KeyboardButton("/search"),
-        KeyboardButton("/help")
-    )
-    keyboard.row(
-        KeyboardButton("/support")
-    )
+    if lang == 'ru':
+        keyboard.row(
+            KeyboardButton("/offer"),
+            KeyboardButton("/request")
+        )
+        keyboard.row(
+            KeyboardButton("/my_offers"),
+            KeyboardButton("/my_requests")
+        )
+        keyboard.row(
+            KeyboardButton("/marketplace"),
+            KeyboardButton("/profile")
+        )
+        keyboard.row(
+            KeyboardButton("/subscribe"),
+            KeyboardButton("/match")
+        )
+        keyboard.row(
+            KeyboardButton("/language"),
+            KeyboardButton("/help")
+        )
+        keyboard.row(
+            KeyboardButton("/menu")
+        )
+    else:
+        keyboard.row(
+            KeyboardButton("/offer"),
+            KeyboardButton("/request")
+        )
+        keyboard.row(
+            KeyboardButton("/my_offers"),
+            KeyboardButton("/my_requests")
+        )
+        keyboard.row(
+            KeyboardButton("/marketplace"),
+            KeyboardButton("/profile")
+        )
+        keyboard.row(
+            KeyboardButton("/subscribe"),
+            KeyboardButton("/match")
+        )
+        keyboard.row(
+            KeyboardButton("/language"),
+            KeyboardButton("/help")
+        )
+        keyboard.row(
+            KeyboardButton("/menu")
+        )
     
     return keyboard
 
-def get_inline_main_keyboard(lang='en', with_icons=False):
-    """Main menu as inline buttons (execute immediately on click)"""
+def get_inline_main_keyboard(lang='en'):
+    """Main menu as inline buttons (execute immediately on click) - FULL list"""
     keyboard = InlineKeyboardMarkup(row_width=2)
     
-    if with_icons:
-        # With icons for visual menu
+    if lang == 'ru':
+        # Profile & Account
+        keyboard.add(
+            InlineKeyboardButton("👤 Профиль", callback_data="profile"),
+            InlineKeyboardButton("🧠 Эмбеддинг", callback_data="embedding")
+        )
+        # Marketplace
+        keyboard.add(
+            InlineKeyboardButton("📤 Предложить", callback_data="offer"),
+            InlineKeyboardButton("📥 Запросить", callback_data="request")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🏠 Недвижимость", callback_data="offer_real_estate"),
+            InlineKeyboardButton("🚕 Такси", callback_data="offer_taxi")
+        )
+        keyboard.add(
+            InlineKeyboardButton("📦 Доставка", callback_data="offer_delivery"),
+            InlineKeyboardButton("🛒 Маркетплейс", callback_data="marketplace")
+        )
+        # My items
+        keyboard.add(
+            InlineKeyboardButton("📦 Мои предложения", callback_data="my_offers"),
+            InlineKeyboardButton("📋 Мои запросы", callback_data="my_requests")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🗑 Удалить предложение", callback_data="delete_offer"),
+            InlineKeyboardButton("🗑 Удалить запрос", callback_data="delete_request")
+        )
+        # People & Search
+        keyboard.add(
+            InlineKeyboardButton("👥 Граждане", callback_data="citizens"),
+            InlineKeyboardButton("🔍 Поиск", callback_data="search")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🎯 Матчинг", callback_data="match"),
+            InlineKeyboardButton("💳 Подписка", callback_data="subscribe")
+        )
+        # Settings & Help
+        keyboard.add(
+            InlineKeyboardButton("🌐 Язык", callback_data="language"),
+            InlineKeyboardButton("❓ Помощь", callback_data="help")
+        )
+        keyboard.add(
+            InlineKeyboardButton("📩 Поддержка", callback_data="support"),
+            InlineKeyboardButton("📋 Меню", callback_data="menu")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🏠 Старт", callback_data="start")
+        )
+    else:
+        # Profile & Account
+        keyboard.add(
+            InlineKeyboardButton("👤 Profile", callback_data="profile"),
+            InlineKeyboardButton("🧠 Embedding", callback_data="embedding")
+        )
+        # Marketplace
         keyboard.add(
             InlineKeyboardButton("📤 Offer", callback_data="offer"),
             InlineKeyboardButton("📥 Request", callback_data="request")
         )
+        keyboard.add(
+            InlineKeyboardButton("🏠 Real Estate", callback_data="offer_real_estate"),
+            InlineKeyboardButton("🚕 Taxi", callback_data="offer_taxi")
+        )
+        keyboard.add(
+            InlineKeyboardButton("📦 Delivery", callback_data="offer_delivery"),
+            InlineKeyboardButton("🛒 Marketplace", callback_data="marketplace")
+        )
+        # My items
         keyboard.add(
             InlineKeyboardButton("📦 My Offers", callback_data="my_offers"),
             InlineKeyboardButton("📋 My Requests", callback_data="my_requests")
@@ -74,57 +154,26 @@ def get_inline_main_keyboard(lang='en', with_icons=False):
             InlineKeyboardButton("🗑 Delete Offer", callback_data="delete_offer"),
             InlineKeyboardButton("🗑 Delete Request", callback_data="delete_request")
         )
+        # People & Search
         keyboard.add(
-            InlineKeyboardButton("🛒 Marketplace", callback_data="marketplace"),
-            InlineKeyboardButton("👤 Profile", callback_data="profile")
+            InlineKeyboardButton("👥 Citizens", callback_data="citizens"),
+            InlineKeyboardButton("🔍 Search", callback_data="search")
         )
         keyboard.add(
-            InlineKeyboardButton("🧠 Embedding", callback_data="embedding"),
-            InlineKeyboardButton("👥 Citizens", callback_data="citizens")
+            InlineKeyboardButton("🎯 Match", callback_data="match"),
+            InlineKeyboardButton("💳 Subscribe", callback_data="subscribe")
         )
+        # Settings & Help
         keyboard.add(
-            InlineKeyboardButton("💳 Subscribe", callback_data="subscribe"),
-            InlineKeyboardButton("🎯 Match", callback_data="match")
-        )
-        keyboard.add(
-            InlineKeyboardButton("🔍 Search", callback_data="search"),
+            InlineKeyboardButton("🌐 Language", callback_data="language"),
             InlineKeyboardButton("❓ Help", callback_data="help")
         )
         keyboard.add(
-            InlineKeyboardButton("📩 Support", callback_data="support")
-        )
-    else:
-        # Clean buttons without icons
-        keyboard.add(
-            InlineKeyboardButton("Offer", callback_data="offer"),
-            InlineKeyboardButton("Request", callback_data="request")
+            InlineKeyboardButton("📩 Support", callback_data="support"),
+            InlineKeyboardButton("📋 Menu", callback_data="menu")
         )
         keyboard.add(
-            InlineKeyboardButton("My Offers", callback_data="my_offers"),
-            InlineKeyboardButton("My Requests", callback_data="my_requests")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Delete Offer", callback_data="delete_offer"),
-            InlineKeyboardButton("Delete Request", callback_data="delete_request")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Marketplace", callback_data="marketplace"),
-            InlineKeyboardButton("Profile", callback_data="profile")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Embedding", callback_data="embedding"),
-            InlineKeyboardButton("Citizens", callback_data="citizens")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Subscribe", callback_data="subscribe"),
-            InlineKeyboardButton("Match", callback_data="match")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Search", callback_data="search"),
-            InlineKeyboardButton("Help", callback_data="help")
-        )
-        keyboard.add(
-            InlineKeyboardButton("Support", callback_data="support")
+            InlineKeyboardButton("🏠 Start", callback_data="start")
         )
     
     return keyboard
