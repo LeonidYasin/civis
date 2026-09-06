@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """
-Marketplace handlers for Civis bot.
+Marketplace command handlers for Civis bot.
 Contains: offer, request, my_offers, my_requests, delete_offer, delete_request, marketplace, offers, requests
 """
 
 import logging
+import sqlite3
 
-from telebot.types import Message
+from telebot.types import Message, ReplyKeyboardRemove
 
 from database import (
     get_user, get_session, set_session, clear_session,
     get_all_offers, get_all_requests,
     get_my_offers, get_my_requests,
-    delete_offer, delete_request,
-    save_offer, save_request
+    save_offer, save_request, delete_offer, delete_request,
+    DB_PATH
 )
-from keyboards import get_main_keyboard, get_category_keyboard
+from locales import TEXTS
+from keyboards import (
+    get_main_keyboard, get_category_keyboard
+)
 from utils import get_text
 
 from .helpers import log_message, bot
 
 logger = logging.getLogger(__name__)
 
-# --- OFFER / REQUEST COMMANDS ---
+# --- COMMAND HANDLERS ---
 
 def cmd_offer(message: Message):
     log_message(message, "[CMD]")
@@ -40,6 +44,63 @@ def cmd_offer(message: Message):
         reply_markup=get_category_keyboard(lang)
     )
 
+def cmd_offer_real_estate(message: Message):
+    """Quick offer in real estate category"""
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    user = get_user(tg_id)
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+        return
+    
+    lang = user.get('language', 'en')
+    set_session(tg_id, 'offer', {'language': lang, 'category': 'real_estate'})
+    bot.reply_to(
+        message,
+        "🏠 **Real Estate Offer**\n\n"
+        "Describe your property (price, location, type, area, rooms, etc.):\n\n"
+        "Example: \"1-room apartment, 45 sq m, city center, $200,000\"",
+        parse_mode='Markdown'
+    )
+
+def cmd_offer_taxi(message: Message):
+    """Quick offer in taxi category"""
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    user = get_user(tg_id)
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+        return
+    
+    lang = user.get('language', 'en')
+    set_session(tg_id, 'offer', {'language': lang, 'category': 'taxi'})
+    bot.reply_to(
+        message,
+        "🚕 **Taxi Service Offer**\n\n"
+        "Describe your taxi service (car type, price per km, availability, etc.):\n\n"
+        "Example: \"Comfort sedan, $2/km, 24/7 available in the city\"",
+        parse_mode='Markdown'
+    )
+
+def cmd_offer_delivery(message: Message):
+    """Quick offer in delivery category"""
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    user = get_user(tg_id)
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+        return
+    
+    lang = user.get('language', 'en')
+    set_session(tg_id, 'offer', {'language': lang, 'category': 'delivery'})
+    bot.reply_to(
+        message,
+        "📦 **Delivery Service Offer**\n\n"
+        "Describe your delivery service (items, price, delivery area, etc.):\n\n"
+        "Example: \"Food delivery, $5 per order, within 5 km radius\"",
+        parse_mode='Markdown'
+    )
+
 def cmd_request(message: Message):
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
@@ -55,46 +116,6 @@ def cmd_request(message: Message):
         "Select the category for your request:\n\nChoose from the buttons below:",
         reply_markup=get_category_keyboard(lang)
     )
-
-def cmd_offers(message: Message):
-    log_message(message, "[CMD]")
-    rows = get_all_offers()
-    if not rows:
-        bot.reply_to(message, "No offers yet. Use /offer to publish one!")
-        return
-    
-    text = "📦 All Offers:\n\n"
-    for row in rows:
-        if len(row) >= 5:
-            id, tg_id, category, offer_text, created_at = row[:5]
-        else:
-            tg_id, offer_text, created_at = row
-            id = '?'
-            category = 'general'
-        user = get_user(tg_id)
-        name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} [{category}] - @{name}: {offer_text}\n\n"
-    bot.reply_to(message, text)
-
-def cmd_requests(message: Message):
-    log_message(message, "[CMD]")
-    rows = get_all_requests()
-    if not rows:
-        bot.reply_to(message, "No requests yet. Use /request to publish one!")
-        return
-    
-    text = "📥 All Requests:\n\n"
-    for row in rows:
-        if len(row) >= 5:
-            id, tg_id, category, req_text, created_at = row[:5]
-        else:
-            tg_id, req_text, created_at = row
-            id = '?'
-            category = 'general'
-        user = get_user(tg_id)
-        name = user.get('name', 'Unknown') if user else 'Unknown'
-        text += f"ID {id} [{category}] - @{name}: {req_text}\n\n"
-    bot.reply_to(message, text)
 
 def cmd_my_offers(message: Message):
     log_message(message, "[CMD]")
@@ -219,4 +240,44 @@ def cmd_marketplace(message: Message):
     else:
         text += "  (none)\n"
     
+    bot.reply_to(message, text)
+
+def cmd_offers(message: Message):
+    log_message(message, "[CMD]")
+    rows = get_all_offers()
+    if not rows:
+        bot.reply_to(message, "No offers yet. Use /offer to publish one!")
+        return
+    
+    text = "📦 All Offers:\n\n"
+    for row in rows:
+        if len(row) >= 5:
+            id, tg_id, category, offer_text, created_at = row[:5]
+        else:
+            tg_id, offer_text, created_at = row
+            id = '?'
+            category = 'general'
+        user = get_user(tg_id)
+        name = user.get('name', 'Unknown') if user else 'Unknown'
+        text += f"ID {id} [{category}] - @{name}: {offer_text}\n\n"
+    bot.reply_to(message, text)
+
+def cmd_requests(message: Message):
+    log_message(message, "[CMD]")
+    rows = get_all_requests()
+    if not rows:
+        bot.reply_to(message, "No requests yet. Use /request to publish one!")
+        return
+    
+    text = "📥 All Requests:\n\n"
+    for row in rows:
+        if len(row) >= 5:
+            id, tg_id, category, req_text, created_at = row[:5]
+        else:
+            tg_id, req_text, created_at = row
+            id = '?'
+            category = 'general'
+        user = get_user(tg_id)
+        name = user.get('name', 'Unknown') if user else 'Unknown'
+        text += f"ID {id} [{category}] - @{name}: {req_text}\n\n"
     bot.reply_to(message, text)
