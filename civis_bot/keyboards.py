@@ -56,49 +56,76 @@ def get_main_keyboard(lang='en'):
     
     return keyboard
 
-def get_inline_main_keyboard(lang='en'):
+def get_inline_main_keyboard(lang='en', with_icons=False):
     """Main menu as inline buttons (execute immediately on click)"""
     keyboard = InlineKeyboardMarkup(row_width=2)
     
-    # Row 1: Create
-    keyboard.add(
-        InlineKeyboardButton("📤 Offer", callback_data="offer"),
-        InlineKeyboardButton("📥 Request", callback_data="request")
-    )
-    # Row 2: View own
-    keyboard.add(
-        InlineKeyboardButton("📦 My Offers", callback_data="my_offers"),
-        InlineKeyboardButton("📋 My Requests", callback_data="my_requests")
-    )
-    # Row 3: Delete
-    keyboard.add(
-        InlineKeyboardButton("🗑 Delete Offer", callback_data="delete_offer"),
-        InlineKeyboardButton("🗑 Delete Request", callback_data="delete_request")
-    )
-    # Row 4: Marketplace & Profile
-    keyboard.add(
-        InlineKeyboardButton("🛒 Marketplace", callback_data="marketplace"),
-        InlineKeyboardButton("👤 Profile", callback_data="profile")
-    )
-    # Row 5: Embedding & Citizens
-    keyboard.add(
-        InlineKeyboardButton("🧠 Embedding", callback_data="embedding"),
-        InlineKeyboardButton("👥 Citizens", callback_data="citizens")
-    )
-    # Row 6: Subscribe & Match
-    keyboard.add(
-        InlineKeyboardButton("💳 Subscribe", callback_data="subscribe"),
-        InlineKeyboardButton("🎯 Match", callback_data="match")
-    )
-    # Row 7: Search & Help
-    keyboard.add(
-        InlineKeyboardButton("🔍 Search", callback_data="search"),
-        InlineKeyboardButton("❓ Help", callback_data="help")
-    )
-    # Row 8: Support
-    keyboard.add(
-        InlineKeyboardButton("📩 Support", callback_data="support")
-    )
+    if with_icons:
+        # With icons for visual menu
+        keyboard.add(
+            InlineKeyboardButton("📤 Offer", callback_data="offer"),
+            InlineKeyboardButton("📥 Request", callback_data="request")
+        )
+        keyboard.add(
+            InlineKeyboardButton("📦 My Offers", callback_data="my_offers"),
+            InlineKeyboardButton("📋 My Requests", callback_data="my_requests")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🗑 Delete Offer", callback_data="delete_offer"),
+            InlineKeyboardButton("🗑 Delete Request", callback_data="delete_request")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🛒 Marketplace", callback_data="marketplace"),
+            InlineKeyboardButton("👤 Profile", callback_data="profile")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🧠 Embedding", callback_data="embedding"),
+            InlineKeyboardButton("👥 Citizens", callback_data="citizens")
+        )
+        keyboard.add(
+            InlineKeyboardButton("💳 Subscribe", callback_data="subscribe"),
+            InlineKeyboardButton("🎯 Match", callback_data="match")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🔍 Search", callback_data="search"),
+            InlineKeyboardButton("❓ Help", callback_data="help")
+        )
+        keyboard.add(
+            InlineKeyboardButton("📩 Support", callback_data="support")
+        )
+    else:
+        # Clean buttons without icons
+        keyboard.add(
+            InlineKeyboardButton("Offer", callback_data="offer"),
+            InlineKeyboardButton("Request", callback_data="request")
+        )
+        keyboard.add(
+            InlineKeyboardButton("My Offers", callback_data="my_offers"),
+            InlineKeyboardButton("My Requests", callback_data="my_requests")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Delete Offer", callback_data="delete_offer"),
+            InlineKeyboardButton("Delete Request", callback_data="delete_request")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Marketplace", callback_data="marketplace"),
+            InlineKeyboardButton("Profile", callback_data="profile")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Embedding", callback_data="embedding"),
+            InlineKeyboardButton("Citizens", callback_data="citizens")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Subscribe", callback_data="subscribe"),
+            InlineKeyboardButton("Match", callback_data="match")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Search", callback_data="search"),
+            InlineKeyboardButton("Help", callback_data="help")
+        )
+        keyboard.add(
+            InlineKeyboardButton("Support", callback_data="support")
+        )
     
     return keyboard
 
