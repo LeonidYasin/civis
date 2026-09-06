@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
 Core command handlers for Civis bot.
-Contains: start, menu, profile, embedding, citizens, help, survey, status, cancel, done, language
+Contains: start, menu, profile, embedding, citizens, help, survey, status, cancel, done, language, reload
 """
 
 import logging
 import sqlite3
+import os
+import sys
 
 from telebot.types import Message, ReplyKeyboardRemove
 
@@ -16,7 +18,8 @@ from database import (
 from locales import TEXTS
 from keyboards import (
     get_main_keyboard, get_language_keyboard,
-    get_values_keyboard, get_roles_keyboard, get_formats_keyboard
+    get_values_keyboard, get_roles_keyboard, get_formats_keyboard,
+    get_inline_main_keyboard
 )
 from utils import get_text, get_embedding_profile
 from config import get_proxy_url
@@ -50,7 +53,7 @@ def cmd_start(message: Message):
     )
 
 def cmd_menu(message: Message):
-    """Show main menu"""
+    """Show full main menu with all commands"""
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
     user = get_user(tg_id)
@@ -59,31 +62,79 @@ def cmd_menu(message: Message):
         return
     
     lang = user.get('language', 'en')
-    text = "📋 **Main Menu**\n\n"
-    text += "Use the buttons below or type commands:\n\n"
-    text += "`/offer` - Publish an offer\n"
-    text += "`/request` - Publish a request\n"
-    text += "`/my_offers` - View your offers\n"
-    text += "`/my_requests` - View your requests\n"
-    text += "`/delete_offer` - Delete your offer\n"
-    text += "`/delete_request` - Delete your request\n"
-    text += "`/marketplace` - View marketplace\n"
-    text += "`/profile` - View your profile\n"
-    text += "`/embedding` - View AI embedding profile\n"
-    text += "`/citizens` - List all citizens\n"
-    text += "`/search` - Search citizens\n"
-    text += "`/subscribe` - View subscription plans\n"
-    text += "`/match` - AI-powered matching\n"
-    text += "`/language` - Change language\n"
-    text += "`/support` - Contact developer\n"
-    text += "`/help` - Help"
     
+    # Full command list
+    text = "📋 **Civis Bot — Full Menu**\n\n"
+    text += "**Profile & Account**\n"
+    text += "`/start` — Create or view your profile\n"
+    text += "`/profile` — View your profile\n"
+    text += "`/survey` — Update your profile\n"
+    text += "`/embedding` — View AI embedding profile\n\n"
+    
+    text += "**Marketplace**\n"
+    text += "`/offer` — Publish an offer (with category)\n"
+    text += "`/offer_real_estate` — Quick real estate offer\n"
+    text += "`/offer_taxi` — Quick taxi offer\n"
+    text += "`/offer_delivery` — Quick delivery offer\n"
+    text += "`/request` — Publish a request\n"
+    text += "`/my_offers` — View your offers\n"
+    text += "`/my_requests` — View your requests\n"
+    text += "`/delete_offer <id>` — Delete your offer\n"
+    text += "`/delete_request <id>` — Delete your request\n"
+    text += "`/marketplace` — View marketplace\n"
+    text += "`/offers` — View all offers\n"
+    text += "`/requests` — View all requests\n\n"
+    
+    text += "**People & Search**\n"
+    text += "`/citizens` — List all citizens\n"
+    text += "`/search <text>` — Search citizens\n"
+    text += "`/match` — AI-powered matching\n\n"
+    
+    text += "**Subscriptions & AI**\n"
+    text += "`/subscribe` — View subscription plans\n"
+    text += "`/setkey <key>` — Set OpenAI API key\n"
+    text += "`/upload_dialog` — Upload dialog history\n"
+    text += "`/my_dialogs` — List uploaded dialogs\n"
+    text += "`/process_dialogs` — Process dialogs\n\n"
+    
+    text += "**Settings & Help**\n"
+    text += "`/language` — Change language\n"
+    text += "`/support` — Contact developer\n"
+    text += "`/status` — Bot status\n"
+    text += "`/help` — Help\n"
+    text += "`/cancel` — Cancel current operation\n"
+    text += "`/done` — Finish value selection\n"
+    
+    # Use inline keyboard for interactive menu
     bot.reply_to(
         message,
         text,
         parse_mode='Markdown',
-        reply_markup=get_main_keyboard(lang)
+        reply_markup=get_inline_main_keyboard(lang)
     )
+
+def cmd_reload(message: Message):
+    """Reload the bot (admin only)"""
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    
+    # Admin check (only Leonid can reload)
+    if tg_id != 521254540:
+        bot.reply_to(message, "⛔ Admin only command.")
+        return
+    
+    bot.reply_to(message, "🔄 Reloading bot...")
+    logger.info("Reloading bot...")
+    
+    # Graceful restart
+    try:
+        # Stop polling
+        bot.stop_polling()
+        # Restart the process
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    except Exception as e:
+        logger.error(f"Reload error: {e}")
+        bot.reply_to(message, f"❌ Reload error: {e}")
 
 def cmd_profile(message: Message):
     log_message(message, "[CMD]")
