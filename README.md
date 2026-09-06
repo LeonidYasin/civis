@@ -1,158 +1,191 @@
-# Civis — Республика профессионалов
+# Civis — Republic of Professionals
 
-**Civis** — это экосистема для поиска и установления связей между людьми на основе их ценностей, целей и профессиональных паттернов. 
+Civis is a community-driven platform where professionals connect based on trust, values, and shared goals. The project is divided into two main components:
 
-Проект развивается в двух направлениях:
-1. **Telegram-бот** (активный MVP) — AI-агент, который помогает пользователям создавать профили, находить единомышленников и взаимодействовать через предложения и запросы.
-2. **Flutter-приложение** (в разработке) — мобильный клиент для более глубокого взаимодействия.
-
-> **Ключевая идея:** AI-агент в диалоге собирает карточку пользователя и ищет по смыслу (LLM-матчинг), создавая бесшовный опыт "зайти в ИИ и непринуждённо болтая находить всё и всех, и чтобы так же находили меня".
+1. **Telegram Bot** — MVP for citizen registration, marketplace, and AI-powered matching.
+2. **MCP Server** — Model Context Protocol server for AI-agent integrations.
 
 ---
 
-## 🚀 Актуальная версия: v0.3.0 (Telegram Bot MVP)
+## 🚀 Features
 
-### 🤖 Основные возможности Telegram-бота
+### Telegram Bot (MVP)
 
-| Команда | Описание |
-|---------|----------|
-| `/start` | Создание профиля (анкета из 5 шагов) |
-| `/profile` | Просмотр своего профиля |
-| `/embedding` | Просмотр AI-эмбеддинга профиля |
-| `/citizens` | Список всех граждан |
-| `/search <текст>` | Поиск граждан по имени, роли или ценностям |
-| `/offer` | Опубликовать предложение (услуга, товар, знания) |
-| `/request` | Опубликовать запрос |
-| `/my_offers` | Ваши предложения с ID для управления |
-| `/my_requests` | Ваши запросы с ID для управления |
-| `/delete_offer <id>` | Удалить предложение |
-| `/delete_request <id>` | Удалить запрос |
-| `/marketplace` | Просмотр маркетплейса (последние 5 предложений/запросов) |
-| `/subscribe` | Просмотр тарифных планов |
-| `/setkey <API-ключ>` | Установить OpenAI API-ключ для AI-матчинга |
-| `/match` | AI-матчинг (поиск совместимых людей) |
-| `/support` | Написать разработчику (сообщение уходит в группу поддержки) |
-| `/language` | Смена языка (Русский / English) |
-| `/help` | Справка по командам |
-| `/cancel` | Отмена текущей операции |
-| `/done` | Завершить выбор ценностей в анкете |
+- **Registration** — Multi-step onboarding (name, about, values, role, format)
+- **Multilingual** — English and Russian support
+- **Profile Management** — View and update your profile
+- **Citizens List** — Browse all registered citizens
+- **Marketplace** — Publish and browse offers and requests
+- **AI Matching** — Semantic search and recommendations via embeddings
+- **Subscription Plans** — Free, Premium ($9.99/mo), Lifetime ($99)
+- **Support** — Contact developer directly via `/support`
+- **Admin Notifications** — Support messages forwarded to the admin group
+
+### MCP Server
+
+- **GitHub Actions Tools** — List workflow runs, get latest run ID, fetch logs by step
+- **Synapse Protocol** — Publish profiles, search people, propose contacts, index GitHub
 
 ---
 
-## 📁 Структура репозитория
+## 🛠 Tech Stack
+
+- **Bot** — Python 3.10+, pyTelegramBotAPI, SQLite
+- **AI** — OpenAI API (embeddings, matching)
+- **MCP** — Flask-based MCP server with auto-discovery
+- **Deployment** — GitHub Actions, Docker (optional)
+
+---
+
+## 📁 Project Structure
 
 ```
 civis/
-├── civis_app/          # Flutter-приложение (iOS + Android)
-│   ├── lib/            # Исходный код
-│   ├── pubspec.yaml    # Зависимости
-│   └── .env.example    # Пример переменных окружения
-├── civis_bot/          # Telegram-бот (Python)
-│   ├── handlers/       # Модульные обработчики команд
-│   │   ├── __init__.py
-│   │   ├── commands.py # Все команды (/start, /profile, /offer, ...)
-│   │   ├── survey.py   # Логика анкеты
-│   │   └── language.py # Выбор языка
-│   ├── bot.py          # Точка входа
-│   ├── config.py       # Настройки (.env, прокси)
-│   ├── database.py     # Работа с SQLite (users, offers, requests, subscriptions)
-│   ├── keyboards.py    # Клавиатуры (плиточные, 2-3 колонки)
-│   ├── locales.py      # Переводы (Русский / English)
-│   ├── utils.py        # Вспомогательные функции (эмбеддинги, матчинг)
-│   ├── requirements.txt
-│   └── .env.example
-└── .github/            # GitHub Actions workflows
-    ├── build_android.yml # Сборка APK
-    └── build_ios.yml     # Сборка IPA (требуется macOS runner)
+├── civis_bot/                 # Telegram Bot
+│   ├── bot.py                 # Entry point
+│   ├── config.py              # Configuration & env
+│   ├── database.py            # SQLite operations
+│   ├── handlers/              # Command handlers (modular)
+│   │   ├── commands.py        # All bot commands
+│   │   ├── survey.py          # Registration flow
+│   │   └── language.py        # Language selection
+│   ├── keyboards.py           # Reply keyboards
+│   ├── locales.py             # i18n (EN/RU)
+│   ├── utils.py               # Helpers (embeddings, matching)
+│   └── .env.example           # Environment template
+├── mcp_server/                # MCP Server
+│   ├── app.py                 # Flask app
+│   ├── tools/                 # Auto-discovered tools
+│   │   ├── github/            # GitHub Actions tools
+│   │   └── synapse/           # Synapse protocol tools
+│   └── requirements.txt
+├── CHANGELOG.md               # Version history
+├── CONTRIBUTING.md            # Contribution guidelines
+└── README.md                  # This file
 ```
 
 ---
 
-## 🧠 Монетизация и подписки
+## 🚦 Getting Started
 
-| План | Цена | Возможности |
-|------|------|-------------|
-| **Free** | $0 | 3 AI-матча в месяц, базовый профиль, просмотр граждан |
-| **Premium** | $9.99/мес | Безлимитные AI-матчи, приоритет в поиске, экспорт профиля (JSON), ранний доступ к новым функциям |
-| **Lifetime** | $99 (разово) | Все возможности Premium + доступ к MCP-инструментам и пожизненные обновления |
+### Prerequisites
 
-Для использования AI-матчинга (`/match`) пользователь может:
-- Ввести свой OpenAI API-ключ через `/setkey` (BYOK — Bring Your Own Key).
-- Перейти на платный тариф через `/subscribe`.
+- Python 3.10+
+- Telegram Bot Token (from @BotFather)
+- OpenAI API Key (optional, for AI matching)
 
----
-
-## 🤖 Запуск Telegram-бота
-
-### 1. Настройка окружения
-
-1. Скопируйте `.env.example` в `.env`:
-   ```bash
-   cd civis_bot
-   cp .env.example .env
-   ```
-
-2. Заполните переменные в `.env`:
-   ```env
-   BOT_TOKEN=ваш_токен_от_BotFather
-   ADMIN_CHAT_ID=-123456789  # ID группы для получения сообщений поддержки (с минусом)
-   PROXY_URL=http://127.0.0.1:10809  # Опционально, если нужен прокси
-   ```
-
-3. Установите зависимости:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### 2. Запуск
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/LeonidYasin/civis.git
+cd civis
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment file
+cp civis_bot/.env.example civis_bot/.env
+
+# Edit .env with your tokens
+nano civis_bot/.env
+```
+
+### Running the Bot
+
+```bash
+cd civis_bot
 python bot.py
 ```
 
----
-
-## 📱 Flutter-приложение (в разработке)
+### Running the MCP Server
 
 ```bash
-cd civis_app
-flutter pub get
-flutter run
+cd mcp_server
+python app.py
 ```
 
 ---
 
-## 🧪 Версионирование
+## 🤖 Bot Commands
 
-Проект использует [Semantic Versioning 2.0.0](https://semver.org/).
-
-| Версия | Дата | Изменения |
-|--------|------|-----------|
-| **v0.3.0** | 2026-09-06 | Добавлен AI-матчинг, подписки, поддержка, удаление офферов/запросов, поиск, модульная архитектура бота |
-| v0.2.0 | 2026-08-XX | Добавлены предложения/запросы, маркетплейс, эмбеддинги |
-| v0.1.0 | 2026-07-XX | MVP: регистрация, профиль, граждане |
+| Command | Description |
+|---------|-------------|
+| `/start` | Create or view your profile |
+| `/menu` | Show main menu |
+| `/profile` | View your profile |
+| `/embedding` | View your AI embedding profile |
+| `/citizens` | List all citizens |
+| `/search` | Search citizens |
+| `/offer` | Publish an offer |
+| `/request` | Publish a request |
+| `/my_offers` | View your offers |
+| `/my_requests` | View your requests |
+| `/delete_offer` | Delete your offer by ID |
+| `/delete_request` | Delete your request by ID |
+| `/marketplace` | View marketplace |
+| `/subscribe` | View subscription plans |
+| `/match` | AI-powered matching |
+| `/setkey` | Set OpenAI API key |
+| `/language` | Change language |
+| `/support` | Contact developer support |
+| `/status` | Bot status |
+| `/help` | Help |
+| `/cancel` | Cancel current operation |
+| `/done` | Finish value selection |
 
 ---
 
-## 🛠 Технологический стек
+## 💰 Subscription Plans
 
-| Компонент | Технологии |
-|-----------|------------|
-| **Telegram Bot** | Python, pyTelegramBotAPI, SQLite |
-| **AI/ML** | OpenAI API (эмбеддинги, LLM-матчинг) |
-| **Flutter App** | Flutter, Dart, SQLite, Dio |
-| **CI/CD** | GitHub Actions |
-
----
-
-## 📄 Лицензия
-
-MIT
+| Plan | Price | Features |
+|------|-------|----------|
+| Free | $0/mo | 3 matches/month, basic profile, view citizens |
+| Premium | $9.99/mo | Unlimited matches, priority search, profile export, early access |
+| Lifetime | $99 one-time | All Premium features + MCP tools access + lifetime updates |
 
 ---
 
-## 📬 Контакты и поддержка
+## 🧠 AI Matching
 
-- **Telegram-канал:** [@civis_channel](https://t.me/civis_channel)
-- **Поддержка в боте:** `/support`
-- **GitHub Issues:** [Создать issue](https://github.com/LeonidYasin/civis/issues)
+Civis uses OpenAI embeddings to match users based on their profile text:
+
+1. User sets OpenAI API key via `/setkey`
+2. Profiles are converted to embeddings
+3. `/match` finds semantically similar profiles
+4. Results show match score and profile details
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📝 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+---
+
+## 📄 License
+
+MIT © Leonid Yasin
+
+---
+
+## 📬 Support
+
+For support, use the `/support` command in the bot or open an issue on GitHub.
+
+---
+
+## 🔮 Future Roadmap
+
+- [ ] Real AI-powered matching with OpenAI
+- [ ] Payment integration (Stripe/PayPal)
+- [ ] Webhook for serverless deployment
+- [ ] Flutter mobile app
+- [ ] Corporate accounts and white-labeling
+- [ ] Private indexes for companies
