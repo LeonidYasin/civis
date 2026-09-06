@@ -76,7 +76,7 @@ set_bot(bot)
 # --- CALLBACK QUERY HANDLER (for inline keyboard) ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call: CallbackQuery):
-    """Handle inline keyboard button clicks"""
+    """Handle inline keyboard button clicks — execute command immediately"""
     tg_id = call.from_user.id
     data = call.data
     
@@ -96,65 +96,44 @@ def handle_callback(call: CallbackQuery):
         'match': '/match',
         'search': '/search',
         'help': '/help',
-        'support': '/support'
+        'support': '/support',
+        'language': '/language',
+        'start': '/start',
+        'menu': '/menu',
     }
     
-    if data in command_map:
-        # Answer callback to remove loading state
-        bot.answer_callback_query(call.id)
-        
-        # Create a fake message to pass to command handlers
-        # We need to simulate a message with the command text
-        class FakeMessage:
-            def __init__(self, text, from_user, chat):
-                self.text = text
-                self.from_user = from_user
-                self.chat = chat
-        
-        fake_msg = FakeMessage(
-            text=command_map[data],
-            from_user=call.from_user,
-            chat=call.message.chat
-        )
-        
-        # Process the command
-        try:
-            # We need to get the command handler from the registered handlers
-            # The simplest way: use bot.process_new_messages with the fake message
-            # But better: directly call the command function
-            from handlers import bot as handler_bot
-            
-            # Find and call the appropriate command handler
-            # We'll use a simple dispatch
-            command_handlers = {
-                '/offer': lambda m: bot.send_message(m.chat.id, "Use /offer to publish an offer"),
-                '/request': lambda m: bot.send_message(m.chat.id, "Use /request to publish a request"),
-                '/my_offers': lambda m: bot.send_message(m.chat.id, "Use /my_offers to see your offers"),
-                '/my_requests': lambda m: bot.send_message(m.chat.id, "Use /my_requests to see your requests"),
-                '/delete_offer': lambda m: bot.send_message(m.chat.id, "Usage: /delete_offer <id>"),
-                '/delete_request': lambda m: bot.send_message(m.chat.id, "Usage: /delete_request <id>"),
-                '/marketplace': lambda m: bot.send_message(m.chat.id, "Use /marketplace to view marketplace"),
-                '/profile': lambda m: bot.send_message(m.chat.id, "Use /profile to view your profile"),
-                '/embedding': lambda m: bot.send_message(m.chat.id, "Use /embedding to view your embedding profile"),
-                '/citizens': lambda m: bot.send_message(m.chat.id, "Use /citizens to list all citizens"),
-                '/subscribe': lambda m: bot.send_message(m.chat.id, "Use /subscribe to view subscription plans"),
-                '/match': lambda m: bot.send_message(m.chat.id, "Use /match for AI-powered matching"),
-                '/search': lambda m: bot.send_message(m.chat.id, "Usage: /search <text>"),
-                '/help': lambda m: bot.send_message(m.chat.id, "Use /help for help"),
-                '/support': lambda m: bot.send_message(m.chat.id, "Use /support to contact developer"),
-            }
-            
-            cmd = command_map[data]
-            if cmd in command_handlers:
-                command_handlers[cmd](fake_msg)
-            else:
-                bot.send_message(call.message.chat.id, f"Command {cmd} not implemented yet.")
-                
-        except Exception as e:
-            logger.error(f"Error handling callback {data}: {e}")
-            bot.send_message(call.message.chat.id, f"Error: {e}")
-    else:
+    if data not in command_map:
         bot.answer_callback_query(call.id, "Unknown action")
+        return
+    
+    # Answer callback to remove loading state
+    bot.answer_callback_query(call.id)
+    
+    # Get the command
+    cmd = command_map[data]
+    
+    # Create a fake message to simulate command
+    class FakeMessage:
+        def __init__(self, text, from_user, chat):
+            self.text = text
+            self.from_user = from_user
+            self.chat = chat
+            self.content_type = 'text'
+    
+    fake_msg = FakeMessage(
+        text=cmd,
+        from_user=call.from_user,
+        chat=call.message.chat
+    )
+    
+    # Process the command using bot's message handler
+    try:
+        # We need to simulate a new message to trigger the command handler
+        # The simplest way: use bot.process_new_messages
+        bot.process_new_messages([fake_msg])
+    except Exception as e:
+        logger.error(f"Error processing callback command {cmd}: {e}")
+        bot.send_message(call.message.chat.id, f"Error: {e}")
 
 # --- SET COMMANDS MENU (left sidebar) ---
 def set_commands_menu():
@@ -188,6 +167,7 @@ def set_commands_menu():
         BotCommand("help", "Help"),
         BotCommand("cancel", "Cancel current operation"),
         BotCommand("done", "Finish value selection"),
+        BotCommand("reload", "Reload bot (admin only)"),
     ]
     bot.set_my_commands(commands)
     logger.info("Commands menu set")
