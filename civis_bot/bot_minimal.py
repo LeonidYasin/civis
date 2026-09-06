@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Минимальная версия бота для проверки соединения с Telegram API.
-Используется для диагностики проблем с сетью и прокси.
+Minimal bot version for connection testing.
+No emoji for Windows console compatibility.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
 
-# --- НАСТРОЙКА ЛОГГИРОВАНИЯ ---
+# --- LOGGING SETUP (no emoji) ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -25,113 +25,112 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- ЗАГРУЗКА ПЕРЕМЕННЫХ ---
+# --- LOAD ENV ---
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    logger.error("❌ BOT_TOKEN не найден в .env файле!")
+    logger.error("ERROR: BOT_TOKEN not found in .env file!")
     sys.exit(1)
-logger.info("✅ Токен загружен")
+logger.info("Token loaded")
 
-# --- ИНИЦИАЛИЗАЦИЯ БОТА ---
+# --- BOT INIT ---
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- ХЕНДЛЕРЫ ---
+# --- HANDLERS ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    """Обработчик команды /start"""
-    logger.info(f"📨 Получена команда /start от {message.from_user.id}")
+    """Handler for /start command"""
+    logger.info(f"Received /start from {message.from_user.id}")
     await message.answer(
-        "👋 Привет! Я минимальный тестовый бот Civis.\n"
-        "Если ты видишь это сообщение — соединение с Telegram API работает!\n\n"
-        "Доступные команды:\n"
-        "/ping - проверить соединение\n"
-        "/echo <текст> - повторить сообщение\n"
-        "/info - информация о боте"
+        "Hello! I am a minimal test bot for Civis.\n"
+        "If you see this - connection to Telegram API works!\n\n"
+        "Available commands:\n"
+        "/ping - check connection\n"
+        "/echo <text> - echo your message\n"
+        "/info - bot information"
     )
 
 @dp.message(Command("ping"))
 async def cmd_ping(message: Message):
-    """Проверка соединения"""
-    logger.info(f"📨 Получена команда /ping от {message.from_user.id}")
+    """Check connection"""
+    logger.info(f"Received /ping from {message.from_user.id}")
     start_time = datetime.now()
-    await message.answer("🏓 Pong!")
+    await message.answer("Pong!")
     end_time = datetime.now()
     latency = (end_time - start_time).total_seconds() * 1000
-    await message.answer(f"⏱️ Задержка: {latency:.0f} мс")
+    await message.answer(f"Latency: {latency:.0f} ms")
 
 @dp.message(Command("echo"))
 async def cmd_echo(message: Message):
-    """Повторяет текст пользователя"""
-    logger.info(f"📨 Получена команда /echo от {message.from_user.id}")
+    """Echo user text"""
+    logger.info(f"Received /echo from {message.from_user.id}")
     text = message.text.replace("/echo", "", 1).strip()
     if text:
-        await message.answer(f"🔊 Эхо: {text}")
+        await message.answer(f"Echo: {text}")
     else:
-        await message.answer("❓ Напиши что-нибудь после /echo")
+        await message.answer("Please write something after /echo")
 
 @dp.message(Command("info"))
 async def cmd_info(message: Message):
-    """Информация о боте"""
-    logger.info(f"📨 Получена команда /info от {message.from_user.id}")
+    """Bot information"""
+    logger.info(f"Received /info from {message.from_user.id}")
     try:
         me = await bot.me()
         await message.answer(
-            f"📊 Информация о боте:\n"
-            f"Имя: {me.full_name}\n"
+            f"Bot info:\n"
+            f"Name: {me.full_name}\n"
             f"Username: @{me.username}\n"
             f"ID: {me.id}\n"
-            f"Токен: {TOKEN[:10]}...{TOKEN[-5:]}"
+            f"Token: {TOKEN[:10]}...{TOKEN[-5:]}"
         )
     except Exception as e:
-        logger.error(f"❌ Ошибка получения информации о боте: {e}")
-        await message.answer(f"❌ Ошибка: {e}")
+        logger.error(f"Error getting bot info: {e}")
+        await message.answer(f"Error: {e}")
 
 @dp.message()
 async def handle_unknown(message: Message):
-    """Обработчик неизвестных сообщений"""
-    logger.info(f"📩 Получено неизвестное сообщение от {message.from_user.id}: {message.text}")
+    """Unknown message handler"""
+    logger.info(f"Unknown message from {message.from_user.id}: {message.text}")
     await message.answer(
-        "🤔 Я не понимаю эту команду.\n"
-        "Используй /start для списка команд."
+        "Unknown command. Use /start for command list."
     )
 
-# --- ЗАПУСК ---
+# --- MAIN ---
 async def main():
-    """Главная функция"""
-    logger.info("🚀 Запуск минимального бота...")
+    """Main function"""
+    logger.info("Starting minimal bot...")
     
     try:
-        # Проверка соединения с Telegram
-        logger.info("🔍 Проверка соединения с Telegram API...")
+        # Check connection to Telegram
+        logger.info("Checking connection to Telegram API...")
         me = await bot.me()
-        logger.info(f"✅ Бот подключен к Telegram API!")
-        logger.info(f"📌 Имя бота: {me.full_name}")
-        logger.info(f"📌 Username: @{me.username}")
-        logger.info(f"📌 ID: {me.id}")
+        logger.info(f"Connected to Telegram API!")
+        logger.info(f"Bot name: {me.full_name}")
+        logger.info(f"Username: @{me.username}")
+        logger.info(f"ID: {me.id}")
         
-        # Запуск polling
-        logger.info("🔄 Запуск polling...")
+        # Start polling
+        logger.info("Starting polling...")
         await dp.start_polling(bot)
         
     except Exception as e:
-        logger.error(f"❌ Критическая ошибка: {e}")
-        logger.error(f"📋 Тип ошибки: {type(e).__name__}")
+        logger.error(f"Critical error: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
         
-        # Подробная диагностика
-        logger.error("🔍 Диагностика:")
-        logger.error(f"  - Python версия: {sys.version}")
-        logger.error(f"  - Токен: {TOKEN[:10]}...{TOKEN[-5:]}")
+        # Diagnostics
+        logger.error("Diagnostics:")
+        logger.error(f"  - Python version: {sys.version}")
+        logger.error(f"  - Token: {TOKEN[:10]}...{TOKEN[-5:]}")
         
-        # Проверка сети
-        logger.error("  - Проверка сети...")
+        # Network check
+        logger.error("  - Checking network...")
         try:
             import socket
             socket.gethostbyname("api.telegram.org")
-            logger.error("  ✅ DNS резолвится: api.telegram.org")
+            logger.error("  DNS resolves: api.telegram.org")
         except Exception as dns_err:
-            logger.error(f"  ❌ DNS ошибка: {dns_err}")
+            logger.error(f"  DNS error: {dns_err}")
         
         sys.exit(1)
 
@@ -139,7 +138,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("⏹️ Бот остановлен пользователем")
+        logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"❌ Необработанная ошибка: {e}")
+        logger.error(f"Unhandled error: {e}")
         sys.exit(1)
