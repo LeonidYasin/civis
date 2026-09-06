@@ -3,48 +3,77 @@
 Keyboard layouts for Civis bot.
 """
 
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+
 from locales import TEXTS
 
 def get_language_keyboard():
+    """Language selection keyboard"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    keyboard.add(KeyboardButton("English"), KeyboardButton("Русский"))
+    keyboard.add(
+        KeyboardButton("English"),
+        KeyboardButton("Русский")
+    )
     return keyboard
 
 def get_main_keyboard(lang='en'):
+    """Main menu keyboard"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    buttons = ["/offer", "/request", "/marketplace", "/profile", "/embedding", "/citizens", "/match", "/subscribe", "/help"]
-    for b in buttons:
-        keyboard.add(KeyboardButton(b))
+    if lang == 'ru':
+        keyboard.add(
+            KeyboardButton("/offer"),
+            KeyboardButton("/request"),
+            KeyboardButton("/marketplace"),
+            KeyboardButton("/profile"),
+            KeyboardButton("/embedding"),
+            KeyboardButton("/citizens"),
+            KeyboardButton("/help"),
+        )
+    else:
+        keyboard.add(
+            KeyboardButton("/offer"),
+            KeyboardButton("/request"),
+            KeyboardButton("/marketplace"),
+            KeyboardButton("/profile"),
+            KeyboardButton("/embedding"),
+            KeyboardButton("/citizens"),
+            KeyboardButton("/help"),
+        )
     return keyboard
 
 def get_values_keyboard(lang='en'):
+    """Values selection keyboard"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    from utils import get_value_buttons
-    for v in get_value_buttons(lang):
+    if lang == 'ru':
+        values = ["Честность", "Экспертиза", "Инициатива", "Надёжность", "Скорость", "Эмпатия", "Системность", "Креативность", "Открытость", "Амбициозность"]
+    else:
+        values = ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
+    
+    for v in values:
         keyboard.add(KeyboardButton(v))
-    keyboard.add(KeyboardButton(TEXTS[lang]['done_button']))
+    keyboard.add(KeyboardButton("/done"))
     return keyboard
 
 def get_roles_keyboard(lang='en'):
+    """Role selection keyboard"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    from utils import get_roles
-    for r in get_roles(lang):
+    if lang == 'ru':
+        roles = ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
+    else:
+        roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
+    
+    for r in roles:
         keyboard.add(KeyboardButton(r))
     return keyboard
 
 def get_formats_keyboard(lang='en'):
+    """Format selection keyboard"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    from utils import get_formats
-    for f in get_formats(lang):
+    if lang == 'ru':
+        formats = ["Текст", "Голос", "Видео", "Любой"]
+    else:
+        formats = ["Text", "Voice", "Video", "Any"]
+    
+    for f in formats:
         keyboard.add(KeyboardButton(f))
-    return keyboard
-
-def get_subscribe_keyboard(lang='en'):
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton("💳 Subscribe Premium - $9.99/mo", callback_data="subscribe_premium"),
-        InlineKeyboardButton("🌟 Lifetime - $99 one-time", callback_data="subscribe_lifetime"),
-        InlineKeyboardButton("🔑 Set API Key", callback_data="setkey")
-    )
     return keyboard
