@@ -8,8 +8,8 @@ import logging
 
 from telebot.types import Message
 
-# Import helpers first
-from .helpers import set_bot, bot
+# Import helpers first - get bot and set_bot
+from .helpers import set_bot, bot, get_bot
 
 # Import command modules
 from .core import (
@@ -34,17 +34,20 @@ from .support import (
 )
 
 # Import survey and language from existing modules
-from .survey import handle_survey, set_bot as set_survey_bot
-from .language import handle_language_selection, set_bot as set_language_bot
+from .survey import handle_survey
+from .language import handle_language_selection
 
 logger = logging.getLogger(__name__)
 
 def register_handlers():
     """Register all command handlers with the bot"""
     # Check if bot is set
-    if bot is None:
-        logger.error("Bot not set! Make sure set_bot() is called before register_handlers()")
-        return
+    try:
+        test_bot = get_bot()
+        if test_bot is None:
+            raise RuntimeError("Bot not set. Call set_bot() first.")
+    except RuntimeError:
+        raise RuntimeError("Bot not set. Call set_bot() first.")
     
     # Core commands
     bot.message_handler(commands=['start'])(cmd_start)
@@ -96,5 +99,5 @@ def register_handlers():
     logger.info("All handlers registered")
 
 __all__ = [
-    'register_handlers', 'set_bot', 'bot'
+    'register_handlers', 'set_bot', 'bot', 'get_bot'
 ]
