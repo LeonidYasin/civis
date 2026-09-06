@@ -17,6 +17,13 @@ TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN not found in .env file!")
 
+# Admin chat ID for support messages
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+if not ADMIN_CHAT_ID:
+    logger.warning("ADMIN_CHAT_ID not set in .env. Support messages will be logged only.")
+else:
+    logger.info(f"Admin chat ID: {ADMIN_CHAT_ID}")
+
 def get_proxy_url():
     """Get proxy URL from .env or environment variables"""
     proxy_url = os.getenv("PROXY_URL")
