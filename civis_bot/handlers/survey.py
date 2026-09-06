@@ -10,7 +10,7 @@ from telebot.types import Message, ReplyKeyboardRemove
 from database import get_user, save_user, get_session, set_session, clear_session, create_subscription, save_offer, save_request
 from locales import TEXTS, VALUE_MAP
 from keyboards import (
-    get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard
+    get_main_keyboard, get_values_keyboard, get_roles_keyboard, get_formats_keyboard, get_category_keyboard
 )
 from utils import get_text
 from config import ADMIN_CHAT_ID
@@ -27,6 +27,17 @@ def get_bot_safe():
         raise RuntimeError("Bot not set")
     return bot
 
+# Category mapping
+CATEGORY_MAP = {
+    'Общее': 'general', 'General': 'general',
+    'Такси': 'taxi', 'Taxi': 'taxi',
+    'Доставка': 'delivery', 'Delivery': 'delivery',
+    'Услуги': 'services', 'Services': 'services',
+    'Товары': 'goods', 'Goods': 'goods',
+    'Недвижимость': 'real_estate', 'Real Estate': 'real_estate',
+    'Другое': 'other', 'Other': 'other'
+}
+
 # --- SURVEY HANDLER ---
 
 def handle_survey(message: Message):
@@ -39,6 +50,7 @@ def handle_survey(message: Message):
     tg_id = message.from_user.id
     text = message.text.strip()
     
+    # If message starts with '/', it's a command - let commands.py handle it
     if text.startswith('/'):
         return
     
@@ -87,20 +99,8 @@ def handle_survey(message: Message):
     
     # --- OFFER CATEGORY SELECTION ---
     if state == 'offer_category':
-        # Map category names
-        category_map = {
-            'Общее': 'general', 'General': 'general',
-            'Такси': 'taxi', 'Taxi': 'taxi',
-            'Доставка': 'delivery', 'Delivery': 'delivery',
-            'Услуги': 'services', 'Services': 'services',
-            'Товары': 'goods', 'Goods': 'goods',
-            'Недвижимость': 'real_estate', 'Real Estate': 'real_estate',
-            'Другое': 'other', 'Other': 'other'
-        }
-        
-        if text in category_map:
-            data['category'] = category_map[text]
-            # Store category in session data
+        if text in CATEGORY_MAP:
+            data['category'] = CATEGORY_MAP[text]
             set_session(tg_id, 'offer', {'language': lang, 'category': data['category']})
             bot.reply_to(
                 message,
@@ -108,7 +108,6 @@ def handle_survey(message: Message):
                 reply_markup=ReplyKeyboardRemove()
             )
         else:
-            from keyboards import get_category_keyboard
             bot.reply_to(
                 message,
                 "Please select a category from the buttons below:",
@@ -118,18 +117,8 @@ def handle_survey(message: Message):
     
     # --- REQUEST CATEGORY SELECTION ---
     if state == 'request_category':
-        category_map = {
-            'Общее': 'general', 'General': 'general',
-            'Такси': 'taxi', 'Taxi': 'taxi',
-            'Доставка': 'delivery', 'Delivery': 'delivery',
-            'Услуги': 'services', 'Services': 'services',
-            'Товары': 'goods', 'Goods': 'goods',
-            'Недвижимость': 'real_estate', 'Real Estate': 'real_estate',
-            'Другое': 'other', 'Other': 'other'
-        }
-        
-        if text in category_map:
-            data['category'] = category_map[text]
+        if text in CATEGORY_MAP:
+            data['category'] = CATEGORY_MAP[text]
             set_session(tg_id, 'request', {'language': lang, 'category': data['category']})
             bot.reply_to(
                 message,
@@ -137,7 +126,6 @@ def handle_survey(message: Message):
                 reply_markup=ReplyKeyboardRemove()
             )
         else:
-            from keyboards import get_category_keyboard
             bot.reply_to(
                 message,
                 "Please select a category from the buttons below:",
@@ -329,7 +317,6 @@ def handle_survey(message: Message):
             bot.reply_to(message, "Error saving your profile. Please try again.")
     
     elif state == 'offer':
-        # Get category from session data
         category = data.get('category', 'general')
         save_offer(tg_id, text, category=category)
         lang = get_user(tg_id).get('language', 'en')
