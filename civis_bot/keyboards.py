@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
 Keyboard layouts for Civis bot.
-Using keyboard.row() for explicit row control.
+Using InlineKeyboardMarkup for interactive buttons and ReplyKeyboardMarkup for input helpers.
 """
 
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import (
+    ReplyKeyboardMarkup, KeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton
+)
 
 def get_language_keyboard():
     """Language selection - 2 columns"""
@@ -16,125 +19,129 @@ def get_language_keyboard():
     return keyboard
 
 def get_main_keyboard(lang='en'):
-    """Main menu - 2 columns with support button"""
+    """Main menu - ReplyKeyboard for quick commands"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
-    # Row 1: Create
     keyboard.row(
         KeyboardButton("/offer"),
         KeyboardButton("/request")
     )
-    # Row 2: Real Estate
-    keyboard.row(
-        KeyboardButton("/offer_real_estate"),
-        KeyboardButton("/request_real_estate")
-    )
-    # Row 3: View own
     keyboard.row(
         KeyboardButton("/my_offers"),
         KeyboardButton("/my_requests")
     )
-    # Row 4: Delete
     keyboard.row(
         KeyboardButton("/delete_offer"),
         KeyboardButton("/delete_request")
     )
-    # Row 5: Marketplace & Profile
     keyboard.row(
         KeyboardButton("/marketplace"),
         KeyboardButton("/profile")
     )
-    # Row 6: Embedding & Citizens
     keyboard.row(
         KeyboardButton("/embedding"),
         KeyboardButton("/citizens")
     )
-    # Row 7: Subscribe & Match
     keyboard.row(
         KeyboardButton("/subscribe"),
         KeyboardButton("/match")
     )
-    # Row 8: Search & Help
     keyboard.row(
         KeyboardButton("/search"),
         KeyboardButton("/help")
     )
-    # Row 9: Support (full width)
     keyboard.row(
         KeyboardButton("/support")
     )
     
     return keyboard
 
+def get_inline_main_keyboard(lang='en'):
+    """Main menu as inline buttons (execute immediately on click)"""
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    
+    # Row 1: Create
+    keyboard.add(
+        InlineKeyboardButton("📤 Offer", callback_data="offer"),
+        InlineKeyboardButton("📥 Request", callback_data="request")
+    )
+    # Row 2: View own
+    keyboard.add(
+        InlineKeyboardButton("📦 My Offers", callback_data="my_offers"),
+        InlineKeyboardButton("📋 My Requests", callback_data="my_requests")
+    )
+    # Row 3: Delete
+    keyboard.add(
+        InlineKeyboardButton("🗑 Delete Offer", callback_data="delete_offer"),
+        InlineKeyboardButton("🗑 Delete Request", callback_data="delete_request")
+    )
+    # Row 4: Marketplace & Profile
+    keyboard.add(
+        InlineKeyboardButton("🛒 Marketplace", callback_data="marketplace"),
+        InlineKeyboardButton("👤 Profile", callback_data="profile")
+    )
+    # Row 5: Embedding & Citizens
+    keyboard.add(
+        InlineKeyboardButton("🧠 Embedding", callback_data="embedding"),
+        InlineKeyboardButton("👥 Citizens", callback_data="citizens")
+    )
+    # Row 6: Subscribe & Match
+    keyboard.add(
+        InlineKeyboardButton("💳 Subscribe", callback_data="subscribe"),
+        InlineKeyboardButton("🎯 Match", callback_data="match")
+    )
+    # Row 7: Search & Help
+    keyboard.add(
+        InlineKeyboardButton("🔍 Search", callback_data="search"),
+        InlineKeyboardButton("❓ Help", callback_data="help")
+    )
+    # Row 8: Support
+    keyboard.add(
+        InlineKeyboardButton("📩 Support", callback_data="support")
+    )
+    
+    return keyboard
+
 def get_category_keyboard(lang='en'):
-    """Category selection for offers/requests - 2 columns"""
+    """Category selection - 2 columns"""
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
     
     if lang == 'ru':
         keyboard.row(
             KeyboardButton("Общее"),
+            KeyboardButton("Такси")
+        )
+        keyboard.row(
+            KeyboardButton("Доставка"),
+            KeyboardButton("Услуги")
+        )
+        keyboard.row(
+            KeyboardButton("Товары"),
             KeyboardButton("Недвижимость")
         )
         keyboard.row(
-            KeyboardButton("Такси"),
-            KeyboardButton("Доставка")
+            KeyboardButton("Другое")
         )
         keyboard.row(
-            KeyboardButton("Услуги"),
-            KeyboardButton("Товары")
-        )
-        keyboard.row(
-            KeyboardButton("Другое"),
             KeyboardButton("/cancel")
         )
     else:
         keyboard.row(
             KeyboardButton("General"),
+            KeyboardButton("Taxi")
+        )
+        keyboard.row(
+            KeyboardButton("Delivery"),
+            KeyboardButton("Services")
+        )
+        keyboard.row(
+            KeyboardButton("Goods"),
             KeyboardButton("Real Estate")
         )
         keyboard.row(
-            KeyboardButton("Taxi"),
-            KeyboardButton("Delivery")
+            KeyboardButton("Other")
         )
         keyboard.row(
-            KeyboardButton("Services"),
-            KeyboardButton("Goods")
-        )
-        keyboard.row(
-            KeyboardButton("Other"),
-            KeyboardButton("/cancel")
-        )
-    
-    return keyboard
-
-def get_property_type_keyboard(lang='en'):
-    """Property type selection - 2 columns"""
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-    
-    if lang == 'ru':
-        keyboard.row(
-            KeyboardButton("Квартира"),
-            KeyboardButton("Дом")
-        )
-        keyboard.row(
-            KeyboardButton("Коммерческая"),
-            KeyboardButton("Земельный участок")
-        )
-        keyboard.row(
-            KeyboardButton("Любой"),
-            KeyboardButton("/cancel")
-        )
-    else:
-        keyboard.row(
-            KeyboardButton("Apartment"),
-            KeyboardButton("House")
-        )
-        keyboard.row(
-            KeyboardButton("Commercial"),
-            KeyboardButton("Land")
-        )
-        keyboard.row(
-            KeyboardButton("Any"),
             KeyboardButton("/cancel")
         )
     
@@ -159,33 +166,27 @@ def get_values_keyboard(lang='en'):
             "Ambition"
         ]
     
-    # Row 1
     keyboard.row(
         KeyboardButton(values[0]),
         KeyboardButton(values[1]),
         KeyboardButton(values[2])
     )
-    # Row 2
     keyboard.row(
         KeyboardButton(values[3]),
         KeyboardButton(values[4]),
         KeyboardButton(values[5])
     )
-    # Row 3
     keyboard.row(
         KeyboardButton(values[6]),
         KeyboardButton(values[7]),
         KeyboardButton(values[8])
     )
-    # Row 4
     keyboard.row(
         KeyboardButton(values[9])
     )
-    # Row 5 - Done button
     keyboard.row(
         KeyboardButton("/done")
     )
-    # Row 6 - Back button
     keyboard.row(
         KeyboardButton("/back")
     )
@@ -201,22 +202,18 @@ def get_roles_keyboard(lang='en'):
     else:
         roles = ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
     
-    # Row 1
     keyboard.row(
         KeyboardButton(roles[0]),
         KeyboardButton(roles[1])
     )
-    # Row 2
     keyboard.row(
         KeyboardButton(roles[2]),
         KeyboardButton(roles[3])
     )
-    # Row 3
     keyboard.row(
         KeyboardButton(roles[4]),
         KeyboardButton(roles[5])
     )
-    # Row 4 - Back button
     keyboard.row(
         KeyboardButton("/back")
     )
@@ -232,17 +229,14 @@ def get_formats_keyboard(lang='en'):
     else:
         formats = ["Text", "Voice", "Video", "Any"]
     
-    # Row 1
     keyboard.row(
         KeyboardButton(formats[0]),
         KeyboardButton(formats[1])
     )
-    # Row 2
     keyboard.row(
         KeyboardButton(formats[2]),
         KeyboardButton(formats[3])
     )
-    # Row 3 - Back button
     keyboard.row(
         KeyboardButton("/back")
     )
