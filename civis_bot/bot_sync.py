@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Civis MVP Bot - Full version with survey, database, and navigation logic.
-Synchronous version using telebot + requests with HTTP proxy support.
+Civis MVP Bot - Natural conversation flow, no hard 300-char limit.
 """
 
 import logging
@@ -15,7 +14,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from telebot import TeleBot
-from telebot.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from telebot.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, BotCommand
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -40,12 +39,6 @@ def get_proxy_url():
     """Get proxy URL from .env or environment"""
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
-        # Проверяем протокол и порт
-        if 'socks5://' in proxy_url and '10809' in proxy_url:
-            # Исправляем SOCKS5 на HTTP для requests
-            fixed = proxy_url.replace('socks5://', 'http://')
-            logger.info(f"Fixed proxy: {proxy_url} -> {fixed}")
-            return fixed
         logger.info(f"Using proxy: {proxy_url}")
         return proxy_url
     
@@ -70,7 +63,6 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
-    # Users table - renamed 'values' to 'user_values' to avoid SQL keyword
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             tg_id INTEGER PRIMARY KEY,
@@ -87,7 +79,6 @@ def init_db():
         )
     """)
     
-    # Sessions table (for FSM)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
             tg_id INTEGER PRIMARY KEY,
@@ -118,12 +109,10 @@ def save_user(tg_id, username, **kwargs):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
-    # Check if exists
     cur.execute("SELECT tg_id FROM users WHERE tg_id = ?", (tg_id,))
     exists = cur.fetchone()
     
     if exists:
-        # Update
         fields = []
         values = []
         for key, val in kwargs.items():
@@ -134,7 +123,6 @@ def save_user(tg_id, username, **kwargs):
         values.append(tg_id)
         cur.execute(f"UPDATE users SET {', '.join(fields)}, updated_at = ? WHERE tg_id = ?", values)
     else:
-        # Insert
         fields = ['tg_id', 'username', 'created_at', 'updated_at']
         values = [tg_id, username, datetime.now().isoformat(), datetime.now().isoformat()]
         for key, val in kwargs.items():
@@ -181,7 +169,6 @@ def clear_session(tg_id):
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
 if proxy_url:
-    # Для requests используем HTTP-прокси
     session = requests.Session()
     session.proxies = {'http': proxy_url, 'https': proxy_url}
     bot = TeleBot(token=TOKEN, threaded=False)
@@ -190,6 +177,20 @@ if proxy_url:
 else:
     bot = TeleBot(token=TOKEN, threaded=False)
     logger.info("Bot created without proxy")
+
+# --- SET COMMANDS MENU ---
+def set_commands():
+    """Set bot commands menu"""
+    commands = [
+        BotCommand("start", "Create or view your profile"),
+        BotCommand("profile", "View your profile"),
+        BotCommand("survey", "Update your profile"),
+        BotCommand("status", "Bot status"),
+        BotCommand("help", "Help"),
+        BotCommand("cancel", "Cancel current operation"),
+    ]
+    bot.set_my_commands(commands)
+    logger.info("Commands menu set")
 
 # --- KEYBOARDS ---
 def get_main_keyboard():
@@ -228,7 +229,7 @@ def get_formats_keyboard():
 # --- COMMAND HANDLERS ---
 @bot.message_handler(commands=['start'])
 def cmd_start(message: Message):
-    """Start command - begins the survey"""
+    """Start command"""
     tg_id = message.from_user.id
     username = message.from_user.username or "unknown"
     logger.info(f"Received /start from {tg_id}")
@@ -238,20 +239,18 @@ def cmd_start(message: Message):
         bot.reply_to(
             message,
             f"Welcome back, {user.get('name', 'friend')}! 🎉\n\n"
-            "Your profile is already complete.\n"
+            "Your profile is complete.\n"
             "Use /profile to view or /survey to update."
         )
         return
     
-    # Start survey
     set_session(tg_id, 'survey_name', {})
     bot.reply_to(
         message,
-        "Welcome to Civis! 🏛️\n"
-        "The Republic of Professionals.\n\n"
-        "Let's create your profile. You'll answer 4 questions.\n"
+        "Welcome to Civis! 🏛️\n\n"
+        "Let's create your profile. Just answer a few questions.\n"
         "Type /cancel anytime to exit.\n\n"
-        "1️⃣ What is your name?",
+        "What is your name?",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -286,14 +285,14 @@ def cmd_help(message: Message):
     """Help command"""
     bot.reply_to(
         message,
-        "📚 Civis Bot Commands:\n\n"
+        "📚 Civis Bot\n\n"
         "/start - Create your profile\n"
         "/profile - View your profile\n"
         "/survey - Update your profile\n"
-        "/status - Check bot status\n"
+        "/status - Bot status\n"
         "/cancel - Cancel current operation\n"
         "/help - Show this message\n\n"
-        "💡 You can also use the buttons!"
+        "💡 Use the buttons for quick actions!"
     )
 
 @bot.message_handler(commands=['survey'])
@@ -306,7 +305,7 @@ def cmd_survey(message: Message):
     bot.reply_to(
         message,
         "📝 Let's update your profile.\n\n"
-        "1️⃣ What is your name?",
+        "What is your name?",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -326,11 +325,10 @@ def cmd_status(message: Message):
         
         bot.reply_to(
             message,
-            f"🤖 Civis Bot Status\n\n"
+            f"🤖 Civis Bot\n\n"
             f"Bot: @{me.username}\n"
-            f"Total profiles: {count}\n"
-            f"Proxy: {proxy_url or 'None'}\n"
-            f"DB: {DB_PATH}"
+            f"Profiles: {count}\n"
+            f"Proxy: {proxy_url or 'None'}"
         )
     except Exception as e:
         logger.error(f"Status error: {e}")
@@ -345,7 +343,7 @@ def cmd_cancel(message: Message):
     clear_session(tg_id)
     bot.reply_to(
         message,
-        "✅ Operation cancelled.\n"
+        "✅ Cancelled.\n"
         "Use /start to begin again.",
         reply_markup=get_main_keyboard()
     )
@@ -353,17 +351,15 @@ def cmd_cancel(message: Message):
 # --- SURVEY STATE HANDLERS ---
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_survey(message: Message):
-    """Handle survey states"""
+    """Handle survey states - natural conversation"""
     tg_id = message.from_user.id
     text = message.text.strip()
     
-    # Ignore commands
     if text.startswith('/'):
         return
     
     state, data = get_session(tg_id)
     if not state:
-        # Not in survey, show help
         bot.reply_to(
             message,
             "Use /start to create your profile or /help for commands.",
@@ -371,7 +367,6 @@ def handle_survey(message: Message):
         )
         return
     
-    # Survey flow
     if state == 'survey_name':
         if len(text) < 2:
             bot.reply_to(message, "Please enter a valid name (at least 2 characters).")
@@ -381,16 +376,17 @@ def handle_survey(message: Message):
         bot.reply_to(
             message,
             f"Nice to meet you, {text}! 👋\n\n"
-            "2️⃣ Tell me about yourself and your professional goals.\n"
-            "Minimum 300 characters. Take your time."
+            "Tell me a bit about yourself and your professional goals.\n"
+            "(Just a few sentences is fine.)"
         )
     
     elif state == 'survey_about':
-        if len(text) < 300:
+        # No hard limit - accept any text, encourage more if too short
+        if len(text) < 20:
             bot.reply_to(
                 message,
-                f"Please write at least 300 characters. You wrote {len(text)}.\n"
-                "Take your time and tell me about yourself."
+                "That's a bit short. Could you tell me a little more about yourself?\n"
+                "(Or just type /skip if you prefer)"
             )
             return
         data['about_text'] = text
@@ -398,13 +394,11 @@ def handle_survey(message: Message):
         bot.reply_to(
             message,
             "Great! 📝\n\n"
-            "3️⃣ Select 3 key values that you share in your work.\n"
-            "Choose from the buttons below:",
+            "Now, select 3 key values that you share in your work.",
             reply_markup=get_values_keyboard()
         )
     
     elif state == 'survey_values':
-        # Check if valid value
         valid_values = ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
         selected = [v.strip() for v in text.split(',')]
         selected = [v for v in selected if v in valid_values]
@@ -422,7 +416,7 @@ def handle_survey(message: Message):
         bot.reply_to(
             message,
             "Excellent! 🎯\n\n"
-            "4️⃣ What is your main role?",
+            "What is your main role?",
             reply_markup=get_roles_keyboard()
         )
     
@@ -440,7 +434,7 @@ def handle_survey(message: Message):
         bot.reply_to(
             message,
             "Almost done! 📱\n\n"
-            "5️⃣ Which communication format is convenient for you?",
+            "Which communication format is convenient for you?",
             reply_markup=get_formats_keyboard()
         )
     
@@ -455,11 +449,9 @@ def handle_survey(message: Message):
         
         data['format'] = text
         
-        # Complete survey
         tg_id = message.from_user.id
         username = message.from_user.username or "unknown"
         
-        # Save to database
         try:
             save_user(
                 tg_id=tg_id,
@@ -478,13 +470,11 @@ def handle_survey(message: Message):
             bot.reply_to(
                 message,
                 f"🎉 Congratulations, {data['name']}!\n\n"
-                "Your profile is complete and saved.\n"
+                "Your profile is complete.\n"
                 "You are now a citizen of Civis! 🏛️\n\n"
-                f"Your profile:\n"
                 f"Role: {data['role']}\n"
                 f"Values: {data['user_values']}\n"
                 f"Format: {data['format']}\n\n"
-                "We'll match you with projects and teams soon.\n"
                 "Use /profile to view or /survey to update.",
                 reply_markup=get_main_keyboard()
             )
@@ -501,10 +491,9 @@ def handle_survey(message: Message):
 # --- MAIN ---
 if __name__ == "__main__":
     try:
-        # Initialize database
         init_db()
+        set_commands()
         
-        # Test connection
         logger.info("Checking connection to Telegram API...")
         me = bot.get_me()
         logger.info(f"Connected: @{me.username} ({me.full_name})")
