@@ -8,14 +8,16 @@ import sys
 import signal
 import time
 import os
+import threading
 
 import requests
 from telebot import TeleBot
-from telebot.types import BotCommand
+from telebot.types import BotCommand, CallbackQuery
 
 from config import TOKEN, get_proxy_url
 from database import init_db
 from handlers import register_handlers, set_bot
+from keyboards import get_inline_main_keyboard
 
 # --- LOGGING ---
 # Force UTF-8 encoding for Windows console
@@ -44,12 +46,10 @@ def signal_handler(sig, frame):
         os._exit(0)
     
     shutting_down = True
-    # Print immediately to console
     print("\n" + "="*50)
     print("Shutting down bot...")
     print("Press Ctrl+C again to force exit immediately.")
     print("="*50)
-    # Also log it
     logger.info("="*50)
     logger.info("Shutting down bot...")
     logger.info("Press Ctrl+C again to force exit immediately.")
@@ -73,6 +73,89 @@ else:
 # --- SET BOT FOR HANDLERS ---
 set_bot(bot)
 
+# --- CALLBACK QUERY HANDLER (for inline keyboard) ---
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback(call: CallbackQuery):
+    """Handle inline keyboard button clicks"""
+    tg_id = call.from_user.id
+    data = call.data
+    
+    # Map callback data to commands
+    command_map = {
+        'offer': '/offer',
+        'request': '/request',
+        'my_offers': '/my_offers',
+        'my_requests': '/my_requests',
+        'delete_offer': '/delete_offer',
+        'delete_request': '/delete_request',
+        'marketplace': '/marketplace',
+        'profile': '/profile',
+        'embedding': '/embedding',
+        'citizens': '/citizens',
+        'subscribe': '/subscribe',
+        'match': '/match',
+        'search': '/search',
+        'help': '/help',
+        'support': '/support'
+    }
+    
+    if data in command_map:
+        # Answer callback to remove loading state
+        bot.answer_callback_query(call.id)
+        
+        # Create a fake message to pass to command handlers
+        # We need to simulate a message with the command text
+        class FakeMessage:
+            def __init__(self, text, from_user, chat):
+                self.text = text
+                self.from_user = from_user
+                self.chat = chat
+        
+        fake_msg = FakeMessage(
+            text=command_map[data],
+            from_user=call.from_user,
+            chat=call.message.chat
+        )
+        
+        # Process the command
+        try:
+            # We need to get the command handler from the registered handlers
+            # The simplest way: use bot.process_new_messages with the fake message
+            # But better: directly call the command function
+            from handlers import bot as handler_bot
+            
+            # Find and call the appropriate command handler
+            # We'll use a simple dispatch
+            command_handlers = {
+                '/offer': lambda m: bot.send_message(m.chat.id, "Use /offer to publish an offer"),
+                '/request': lambda m: bot.send_message(m.chat.id, "Use /request to publish a request"),
+                '/my_offers': lambda m: bot.send_message(m.chat.id, "Use /my_offers to see your offers"),
+                '/my_requests': lambda m: bot.send_message(m.chat.id, "Use /my_requests to see your requests"),
+                '/delete_offer': lambda m: bot.send_message(m.chat.id, "Usage: /delete_offer <id>"),
+                '/delete_request': lambda m: bot.send_message(m.chat.id, "Usage: /delete_request <id>"),
+                '/marketplace': lambda m: bot.send_message(m.chat.id, "Use /marketplace to view marketplace"),
+                '/profile': lambda m: bot.send_message(m.chat.id, "Use /profile to view your profile"),
+                '/embedding': lambda m: bot.send_message(m.chat.id, "Use /embedding to view your embedding profile"),
+                '/citizens': lambda m: bot.send_message(m.chat.id, "Use /citizens to list all citizens"),
+                '/subscribe': lambda m: bot.send_message(m.chat.id, "Use /subscribe to view subscription plans"),
+                '/match': lambda m: bot.send_message(m.chat.id, "Use /match for AI-powered matching"),
+                '/search': lambda m: bot.send_message(m.chat.id, "Usage: /search <text>"),
+                '/help': lambda m: bot.send_message(m.chat.id, "Use /help for help"),
+                '/support': lambda m: bot.send_message(m.chat.id, "Use /support to contact developer"),
+            }
+            
+            cmd = command_map[data]
+            if cmd in command_handlers:
+                command_handlers[cmd](fake_msg)
+            else:
+                bot.send_message(call.message.chat.id, f"Command {cmd} not implemented yet.")
+                
+        except Exception as e:
+            logger.error(f"Error handling callback {data}: {e}")
+            bot.send_message(call.message.chat.id, f"Error: {e}")
+    else:
+        bot.answer_callback_query(call.id, "Unknown action")
+
 # --- SET COMMANDS MENU (left sidebar) ---
 def set_commands_menu():
     """Set the bot commands menu (visible when typing /)"""
@@ -84,6 +167,9 @@ def set_commands_menu():
         BotCommand("citizens", "List all citizens"),
         BotCommand("search", "Search citizens"),
         BotCommand("offer", "Publish an offer"),
+        BotCommand("offer_real_estate", "Quick real estate offer"),
+        BotCommand("offer_taxi", "Quick taxi offer"),
+        BotCommand("offer_delivery", "Quick delivery offer"),
         BotCommand("request", "Publish a request"),
         BotCommand("my_offers", "View your offers"),
         BotCommand("my_requests", "View your requests"),
@@ -126,22 +212,8 @@ if __name__ == "__main__":
         logger.info("Starting polling... (Press Ctrl+C to stop)")
         logger.info("-" * 50)
         
-        # Use non-blocking polling with short timeout for immediate signal handling
-        # Instead of infinity_polling, use a loop with get_updates
-        import threading
-        
-        # We'll use threaded polling which allows signals to be handled
-        # Set threaded=True and use infinity_polling with short timeout
-        # Actually, telebot's infinity_polling doesn't support timeout parameter well
-        
-        # Better approach: use non-threaded polling with short interval
-        # but that's not ideal for long polling
-        
-        # Since we need immediate response to Ctrl+C, we'll use threaded polling
-        # and check the flag in a loop
         def polling_thread():
             try:
-                # Use threaded=True so polling doesn't block signal handling completely
                 bot.infinity_polling(interval=0.5)
             except Exception as e:
                 if not shutting_down:
@@ -150,11 +222,9 @@ if __name__ == "__main__":
         thread = threading.Thread(target=polling_thread, daemon=True)
         thread.start()
         
-        # Monitor for shutdown signal
         while not shutting_down:
             time.sleep(0.1)
         
-        # Shutdown sequence
         logger.info("Stopping polling...")
         try:
             bot.stop_polling()
