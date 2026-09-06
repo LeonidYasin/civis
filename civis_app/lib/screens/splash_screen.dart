@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/profile_database.dart';
-import 'welcome_screen.dart';
-import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,27 +12,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkProfileAndNavigate();
+    _checkProfile();
   }
 
-  Future<void> _checkProfileAndNavigate() async {
-    // Ждём 1.5 секунды для красоты
-    await Future.delayed(const Duration(seconds: 1));
-
-    final hasProfile = await ProfileDatabase.instance.hasProfile();
+  Future<void> _checkProfile() async {
+    await Future.delayed(const Duration(seconds: 2));
+    final prefs = await SharedPreferences.getInstance();
+    final hasProfile = prefs.getBool('has_profile') ?? false;
 
     if (mounted) {
-      if (hasProfile) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-        );
-      }
+      Navigator.pushReplacementNamed(
+        context,
+        hasProfile ? '/home' : '/welcome',
+      );
     }
   }
 
@@ -46,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.verified,
+              Icons.people_alt_outlined,
               size: 80,
               color: Colors.blue,
             ),
@@ -56,18 +46,14 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 2,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
               'Республика профессионалов',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
             const CircularProgressIndicator(),
           ],
         ),
