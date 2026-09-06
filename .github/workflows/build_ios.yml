@@ -1,0 +1,40 @@
+name: Build iOS
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'civis_app/**'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+
+      - name: Install dependencies
+        working-directory: ./civis_app
+        run: flutter pub get
+
+      - name: Build iOS
+        working-directory: ./civis_app
+        run: flutter build ios --release --no-codesign
+
+      - name: Archive IPA
+        run: |
+          cd civis_app/build/ios/iphoneos
+          mkdir Payload
+          cp -R Runner.app Payload/
+          zip -r civis-app-ios.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: civis-app-ios
+          path: civis_app/build/ios/iphoneos/civis-app-ios.ipa
