@@ -7,6 +7,7 @@ import logging
 import sys
 import signal
 import time
+import os
 
 import requests
 from telebot import TeleBot
@@ -17,6 +18,12 @@ from database import init_db
 from handlers import register_handlers, set_bot
 
 # --- LOGGING ---
+# Force UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,31 +40,28 @@ shutting_down = False
 def signal_handler(sig, frame):
     global shutting_down
     if shutting_down:
-        # Second Ctrl+C - force exit
-        logger.info("⚠️ Force exit...")
+        logger.info("Force exit...")
         sys.exit(0)
     
     shutting_down = True
-    logger.info("\n" + "="*50)
-    logger.info("🛑 Shutting down bot...")
-    logger.info("   Please wait a moment...")
-    logger.info("   Press Ctrl+C again to force exit.")
+    logger.info("="*50)
+    logger.info("Shutting down bot...")
+    logger.info("Please wait a moment...")
+    logger.info("Press Ctrl+C again to force exit.")
     logger.info("="*50)
     
-    # Stop polling gracefully
     try:
-        logger.info("⏳ Stopping polling...")
+        logger.info("Stopping polling...")
         bot.stop_polling()
-        logger.info("✅ Polling stopped.")
+        logger.info("Polling stopped.")
     except Exception as e:
-        logger.warning(f"⚠️ Error during shutdown: {e}")
+        logger.warning(f"Error during shutdown: {e}")
     
-    # Give a moment for cleanup
-    for i in range(5, 0, -1):
-        logger.info(f"⏳ Exiting in {i}...")
+    for i in range(3, 0, -1):
+        logger.info(f"Exiting in {i}...")
         time.sleep(1)
     
-    logger.info("👋 Bot stopped.")
+    logger.info("Bot stopped.")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -70,10 +74,10 @@ if proxy_url:
     session.proxies = {'http': proxy_url, 'https': proxy_url}
     bot = TeleBot(token=TOKEN, threaded=False)
     bot.session = session
-    logger.info(f"✅ Bot created with proxy: {proxy_url}")
+    logger.info(f"Bot created with proxy: {proxy_url}")
 else:
     bot = TeleBot(token=TOKEN, threaded=False)
-    logger.info("✅ Bot created without proxy")
+    logger.info("Bot created without proxy")
 
 # --- SET BOT FOR HANDLERS ---
 set_bot(bot)
@@ -109,7 +113,7 @@ def set_commands_menu():
         BotCommand("done", "Finish value selection"),
     ]
     bot.set_my_commands(commands)
-    logger.info("📋 Commands menu set")
+    logger.info("Commands menu set")
 
 # --- REGISTER HANDLERS ---
 register_handlers()
@@ -117,26 +121,26 @@ register_handlers()
 # --- MAIN ---
 if __name__ == "__main__":
     try:
-        logger.info("🚀 Starting Civis Bot...")
+        logger.info("Starting Civis Bot...")
         
         init_db()
-        logger.info("💾 Database initialized")
+        logger.info("Database initialized")
         
         set_commands_menu()
         
-        logger.info("🔌 Checking connection to Telegram API...")
+        logger.info("Checking connection to Telegram API...")
         me = bot.get_me()
-        logger.info(f"✅ Connected: @{me.username} ({me.full_name})")
+        logger.info(f"Connected: @{me.username} ({me.full_name})")
         
-        logger.info("▶️ Starting polling... (Press Ctrl+C to stop)")
+        logger.info("Starting polling... (Press Ctrl+C to stop)")
         logger.info("-" * 50)
         bot.infinity_polling()
         
     except KeyboardInterrupt:
-        logger.info("\n🛑 Bot stopped by user (Ctrl+C)")
+        logger.info("\nBot stopped by user (Ctrl+C)")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"❌ Critical error: {e}")
+        logger.error(f"Critical error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
