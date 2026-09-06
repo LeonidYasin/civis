@@ -50,12 +50,19 @@ TEXTS = {
         'setkey_required': "You need to set your OpenAI API key first.\nUse /setkey sk-... to set your key.",
         'match_no_citizens': "No citizens to match with yet. Come back later!",
         'match_no_others': "No other citizens to match with yet. Share the bot with friends!",
-        'match_in_progress': "AI Matching in progress...\n\nYour profile:\n{profile}\n\nWe're analyzing {count} other citizens.\nFull AI matching coming soon!",
+        'match_in_progress': "Analyzing your profile and finding matches...",
         'match_limit_exceeded': "You've used all your free matches.\nRemaining: {remaining}\nUse /subscribe to upgrade to Premium.",
         'support_prompt': "Describe your question or issue. We'll get back to you.",
         'support_sent': "Your message has been sent to the developer. We'll respond soon!",
         'support_error': "Error sending message. Please try again later.",
         'values_list': "Honesty, Expertise, Initiative, Reliability, Speed, Empathy, Systematic, Creativity, Openness, Ambition",
+        'buttons': {
+            'offer': "/offer",
+            'request': "/request",
+            'marketplace': "/marketplace",
+            'profile': "/profile",
+            'help': "/help",
+        }
     },
     'ru': {
         'welcome': "Добро пожаловать в Civis!\n\nCivis — это Республика Профессионалов — сообщество, где люди соединяются на основе доверия, ценностей и общих целей.\n\nМы используем ИИ, чтобы понять, кто вы, и подобрать вам подходящих людей, проекты и возможности.\n\nБез резюме. Без холодных звонков. Только настоящие связи.\n\nДавайте создадим ваш профиль!",
@@ -102,12 +109,19 @@ TEXTS = {
         'setkey_required': "Вам нужно сначала установить OpenAI API ключ.\nИспользуйте /setkey sk-... чтобы установить ключ.",
         'match_no_citizens': "Нет граждан для матчинга. Зайдите позже!",
         'match_no_others': "Нет других граждан для матчинга. Поделитесь ботом с друзьями!",
-        'match_in_progress': "ИИ-матчинг в процессе...\n\nВаш профиль:\n{profile}\n\nАнализируем {count} других граждан.\nПолный ИИ-матчинг скоро будет доступен!",
+        'match_in_progress': "Анализируем ваш профиль и ищем совпадения...",
         'match_limit_exceeded': "Вы использовали все бесплатные матчи.\nОсталось: {remaining}\nИспользуйте /subscribe чтобы перейти на Премиум.",
         'support_prompt': "Опишите ваш вопрос или проблему. Мы ответим вам.",
         'support_sent': "Ваше сообщение отправлено разработчику. Мы ответим скоро!",
         'support_error': "Ошибка отправки сообщения. Пожалуйста, попробуйте позже.",
         'values_list': "Честность, Экспертиза, Инициатива, Надёжность, Скорость, Эмпатия, Системность, Креативность, Открытость, Амбициозность",
+        'buttons': {
+            'offer': "/offer",
+            'request': "/request",
+            'marketplace': "/marketplace",
+            'profile': "/profile",
+            'help': "/help",
+        }
     }
 }
 
@@ -140,19 +154,16 @@ VALUE_MAP = {
 }
 
 def get_value_buttons(lang):
-    """Get value buttons for the given language"""
     if lang == 'ru':
         return ["Честность", "Экспертиза", "Инициатива", "Надёжность", "Скорость", "Эмпатия", "Системность", "Креативность", "Открытость", "Амбициозность"]
     return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
 
 def get_roles(lang):
-    """Get roles for the given language"""
     if lang == 'ru':
         return ["Исполнитель", "Заказчик", "Координатор", "Инвестор", "Продавец", "Покупатель"]
     return ["Executor", "Customer", "Coordinator", "Investor", "Seller", "Buyer"]
 
 def get_formats(lang):
-    """Get formats for the given language"""
     if lang == 'ru':
         return ["Текст", "Голос", "Видео", "Любой"]
     return ["Text", "Voice", "Video", "Any"]
