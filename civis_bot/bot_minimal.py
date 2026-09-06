@@ -17,7 +17,6 @@ from dotenv import load_dotenv
 # Proxy support
 import aiohttp
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiohttp_socks import ProxyConnector
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -38,13 +37,13 @@ if not TOKEN:
 logger.info("Token loaded")
 
 # --- PROXY SETUP ---
-def get_proxy_connector():
-    """Create proxy connector from .env or environment variables"""
+def get_proxy_url():
+    """Get proxy URL from .env or environment"""
     # First check .env
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
         logger.info(f"Proxy from .env: {proxy_url}")
-        return ProxyConnector.from_url(proxy_url)
+        return proxy_url
     
     # Then check system env
     http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
@@ -52,34 +51,16 @@ def get_proxy_connector():
     
     if https_proxy:
         logger.info(f"Proxy from HTTPS_PROXY: {https_proxy}")
-        return ProxyConnector.from_url(https_proxy)
+        return https_proxy
     elif http_proxy:
         logger.info(f"Proxy from HTTP_PROXY: {http_proxy}")
-        return ProxyConnector.from_url(http_proxy)
+        return http_proxy
     
     logger.info("No proxy configured, using direct connection")
     return None
 
-# --- CREATE SESSION ---
-def create_bot_session():
-    """Create bot with proxy support if configured"""
-    connector = get_proxy_connector()
-    if connector:
-        # Create aiohttp session with proxy
-        aiohttp_session = aiohttp.ClientSession(connector=connector)
-        aiogram_session = AiohttpSession(session=aiohttp_session)
-        return aiogram_session
-    else:
-        # Use default session
-        return None
-
 # --- BOT INIT ---
-session = create_bot_session()
-if session:
-    bot = Bot(token=TOKEN, session=session)
-else:
-    bot = Bot(token=TOKEN)
-dp = Dispatcher()
+# We'll create bot inside main() with proxy
 
 # --- HANDLERS ---
 @dp.message(Command("start"))
@@ -140,10 +121,36 @@ async def handle_unknown(message: Message):
         "Unknown command. Use /start for command list."
     )
 
+# --- CREATE BOT INSIDE MAIN ---
+async def create_bot_with_proxy():
+    """Create bot with proxy if configured"""
+    proxy_url = get_proxy_url()
+    
+    if proxy_url:
+        # Import here to avoid event loop issues
+        from aiohttp_socks import ProxyConnector
+        connector = ProxyConnector.from_url(proxy_url)
+        aiohttp_session = aiohttp.ClientSession(connector=connector)
+        aiogram_session = AiohttpSession(session=aiohttp_session)
+        return Bot(token=TOKEN, session=aiogram_session)
+    else:
+        return Bot(token=TOKEN)
+
 # --- MAIN ---
 async def main():
     """Main function"""
     logger.info("Starting minimal bot...")
+    
+    # Create bot inside event loop
+    bot = await create_bot_with_proxy()
+    dp = Dispatcher()
+    
+    # Register handlers
+    dp.message.register(cmd_start, Command("start"))
+    dp.message.register(cmd_ping, Command("ping"))
+    dp.message.register(cmd_echo, Command("echo"))
+    dp.message.register(cmd_info, Command("info"))
+    dp.message.register(handle_unknown)
     
     try:
         # Check connection to Telegram
@@ -176,11 +183,11 @@ async def main():
             logger.error(f"  DNS error: {dns_err}")
         
         # Proxy check
-        proxy_url = os.getenv("PROXY_URL")
+        proxy_url = get_proxy_url()
         if proxy_url:
-            logger.error(f"  Proxy configured in .env: {proxy_url}")
+            logger.error(f"  Proxy configured: {proxy_url}")
         else:
-            logger.error("  Proxy not configured in .env")
+            logger.error("  Proxy not configured")
         
         sys.exit(1)
 
