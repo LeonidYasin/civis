@@ -8,7 +8,6 @@ import sys
 import signal
 import time
 import os
-import threading
 
 import requests
 from telebot import TeleBot
@@ -42,36 +41,19 @@ def signal_handler(sig, frame):
     global shutting_down
     if shutting_down:
         logger.info("Force exit...")
-        # Force exit immediately on second Ctrl+C
         os._exit(0)
     
     shutting_down = True
+    # Print immediately to console
+    print("\n" + "="*50)
+    print("Shutting down bot...")
+    print("Press Ctrl+C again to force exit immediately.")
+    print("="*50)
+    # Also log it
     logger.info("="*50)
     logger.info("Shutting down bot...")
     logger.info("Press Ctrl+C again to force exit immediately.")
     logger.info("="*50)
-    
-    # Try to stop polling gracefully in background
-    def stop_polling_thread():
-        try:
-            logger.info("Stopping polling...")
-            bot.stop_polling()
-            logger.info("Polling stopped.")
-        except Exception as e:
-            logger.warning(f"Error during shutdown: {e}")
-        
-        # Wait a bit then exit if not already
-        time.sleep(1)
-        if not shutting_down:
-            return
-        logger.info("Bot stopped.")
-        os._exit(0)
-    
-    # Run stop in background thread so main thread can respond to second Ctrl+C
-    thread = threading.Thread(target=stop_polling_thread, daemon=True)
-    thread.start()
-    
-    # If shutdown takes too long, second Ctrl+C will force exit via os._exit
 
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
@@ -143,7 +125,44 @@ if __name__ == "__main__":
         
         logger.info("Starting polling... (Press Ctrl+C to stop)")
         logger.info("-" * 50)
-        bot.infinity_polling()
+        
+        # Use non-blocking polling with short timeout for immediate signal handling
+        # Instead of infinity_polling, use a loop with get_updates
+        import threading
+        
+        # We'll use threaded polling which allows signals to be handled
+        # Set threaded=True and use infinity_polling with short timeout
+        # Actually, telebot's infinity_polling doesn't support timeout parameter well
+        
+        # Better approach: use non-threaded polling with short interval
+        # but that's not ideal for long polling
+        
+        # Since we need immediate response to Ctrl+C, we'll use threaded polling
+        # and check the flag in a loop
+        def polling_thread():
+            try:
+                # Use threaded=True so polling doesn't block signal handling completely
+                bot.infinity_polling(interval=0.5)
+            except Exception as e:
+                if not shutting_down:
+                    logger.error(f"Polling error: {e}")
+        
+        thread = threading.Thread(target=polling_thread, daemon=True)
+        thread.start()
+        
+        # Monitor for shutdown signal
+        while not shutting_down:
+            time.sleep(0.1)
+        
+        # Shutdown sequence
+        logger.info("Stopping polling...")
+        try:
+            bot.stop_polling()
+        except:
+            pass
+        
+        logger.info("Bot stopped.")
+        sys.exit(0)
         
     except KeyboardInterrupt:
         logger.info("\nBot stopped by user (Ctrl+C)")
