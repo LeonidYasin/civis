@@ -17,6 +17,9 @@ from dotenv import load_dotenv
 from telebot import TeleBot
 from telebot.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, BotCommand
 
+# Import translations
+from locales import TEXTS, VALUE_MAP, get_value_buttons, get_roles, get_formats
+
 # --- LOGGING ---
 logging.basicConfig(
     level=logging.INFO,
@@ -175,120 +178,11 @@ def clear_session(tg_id):
     conn.commit()
     conn.close()
 
-# --- TRANSLATIONS ---
-TEXTS = {
-    'en': {
-        'welcome': "Welcome to Civis!\n\nCivis is a Republic of Professionals - a community where people connect based on trust, values, and shared goals.\n\nWe use AI to understand who you are and match you with the right people, projects, and opportunities.\n\nNo resumes. No cold calls. Just real connections.\n\nLet's create your profile!",
-        'language_set': "Language set to English.",
-        'choose_language': "Choose your language:",
-        'name_ask': "What is your name?",
-        'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
-        'about_short': "That's a bit short. Could you tell me a little more about yourself?",
-        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just click the buttons one by one. You'll see your selection below.)",
-        'values_ask': "Choose 3 values from the buttons below:",
-        'values_selected': "Selected: {values}\n\nChoose {remaining} more or click /done when finished:",
-        'values_error': "Please select 3 values total. You have {count}. Choose {remaining} more.",
-        'values_complete': "Great! You've selected 3 values.",
-        'role_ask': "What is your main role?",
-        'role_error': "Please select a role from the buttons.",
-        'format_ask': "Which communication format is convenient for you?",
-        'format_error': "Please select a format from the buttons.",
-        'profile_complete': "Congratulations! You are now a citizen of Civis!",
-        'welcome_citizen': "Welcome to Civis, {name}!\n\nYou are now a citizen. You can:\n/offer - Publish an offer (sell something)\n/request - Publish a request (buy something)\n/marketplace - View all offers and requests\n/profile - View your profile\n/survey - Update your profile",
-        'cancel': "Cancelled.",
-        'unknown': "Use /start to create your profile or /help for commands.",
-        'profile': "Profile:",
-        'no_profile': "You don't have a profile yet. Use /start to create one!",
-        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
-        'status': "Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
-        'done_button': "/done",
-        'marketplace_empty': "Marketplace is empty. Use /offer or /request to publish something.",
-        'offer_prompt': "Describe what you are offering (service, product, knowledge, etc.):",
-        'request_prompt': "Describe what you are looking for (service, product, etc.):",
-        'offer_saved': "Your offer has been published!",
-        'request_saved': "Your request has been published!",
-    },
-    'ru': {
-        'welcome': "Welcome to Civis!\n\nCivis is a Republic of Professionals - a community where people connect based on trust, values, and shared goals.\n\nWe use AI to understand who you are and match you with the right people, projects, and opportunities.\n\nNo resumes. No cold calls. Just real connections.\n\nLet's create your profile!",
-        'language_set': "Language set to Russian.",
-        'choose_language': "Choose your language:",
-        'name_ask': "What is your name?",
-        'about_ask': "Tell me a bit about yourself and your professional goals.\n(Just a few sentences is fine.)",
-        'about_short': "That's a bit short. Could you tell me a little more about yourself?",
-        'values_intro': "To match you with the right people, we need to understand what matters to you in work.\n\nSelect 3 key values from the list below.\n(Just click the buttons one by one. You'll see your selection below.)",
-        'values_ask': "Choose 3 values from the buttons below:",
-        'values_selected': "Selected: {values}\n\nChoose {remaining} more or click /done when finished:",
-        'values_error': "Please select 3 values total. You have {count}. Choose {remaining} more.",
-        'values_complete': "Great! You've selected 3 values.",
-        'role_ask': "What is your main role?",
-        'role_error': "Please select a role from the buttons.",
-        'format_ask': "Which communication format is convenient for you?",
-        'format_error': "Please select a format from the buttons.",
-        'profile_complete': "Congratulations! You are now a citizen of Civis!",
-        'welcome_citizen': "Welcome to Civis, {name}!\n\nYou are now a citizen. You can:\n/offer - Publish an offer (sell something)\n/request - Publish a request (buy something)\n/marketplace - View all offers and requests\n/profile - View your profile\n/survey - Update your profile",
-        'cancel': "Cancelled.",
-        'unknown': "Use /start to create your profile or /help for commands.",
-        'profile': "Profile:",
-        'no_profile': "You don't have a profile yet. Use /start to create one!",
-        'help': "Civis Bot\n\n/start - Create your profile\n/profile - View your profile\n/survey - Update your profile\n/offer - Publish an offer\n/request - Publish a request\n/marketplace - View marketplace\n/status - Bot status\n/cancel - Cancel current operation\n/help - Show this message",
-        'status': "Civis Bot\n\nProfiles: {count}\nProxy: {proxy}",
-        'done_button': "/done",
-        'marketplace_empty': "Marketplace is empty. Use /offer or /request to publish something.",
-        'offer_prompt': "Describe what you are offering (service, product, knowledge, etc.):",
-        'request_prompt': "Describe what you are looking for (service, product, etc.):",
-        'offer_saved': "Your offer has been published!",
-        'request_saved': "Your request has been published!",
-    }
-}
-
-# --- VALUE MAPPING ---
-VALUE_MAP = {
-    'en': {
-        'Honesty': 'Honesty',
-        'Expertise': 'Expertise',
-        'Initiative': 'Initiative',
-        'Reliability': 'Reliability',
-        'Speed': 'Speed',
-        'Empathy': 'Empathy',
-        'Systematic': 'Systematic',
-        'Creativity': 'Creativity',
-        'Openness': 'Openness',
-        'Ambition': 'Ambition',
-    },
-    'ru': {
-        'Honesty': 'Honesty',
-        'Expertise': 'Expertise',
-        'Initiative': 'Initiative',
-        'Reliability': 'Reliability',
-        'Speed': 'Speed',
-        'Empathy': 'Empathy',
-        'Systematic': 'Systematic',
-        'Creativity': 'Creativity',
-        'Openness': 'Openness',
-        'Ambition': 'Ambition',
-    }
-}
-
 def get_text(tg_id, key, **kwargs):
     user = get_user(tg_id)
     lang = user.get('language', 'en') if user else 'en'
     text = TEXTS.get(lang, TEXTS['en']).get(key, TEXTS['en'][key])
     return text.format(**kwargs) if kwargs else text
-
-def get_value_buttons(lang):
-    if lang == 'ru':
-        return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
-    return ["Honesty", "Expertise", "Initiative", "Reliability", "Speed", "Empathy", "Systematic", "Creativity", "Openness", "Ambition"]
-
-def get_roles(lang):
-    if lang == 'ru':
-        return ["Executor", "Customer", "Coordinator", "Investor"]
-    return ["Executor", "Customer", "Coordinator", "Investor"]
-
-def get_formats(lang):
-    if lang == 'ru':
-        return ["Text", "Voice", "Video", "Any"]
-    return ["Text", "Voice", "Video", "Any"]
 
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
@@ -311,6 +205,7 @@ def set_commands():
         BotCommand("offer", "Publish an offer"),
         BotCommand("request", "Publish a request"),
         BotCommand("marketplace", "View marketplace"),
+        BotCommand("language", "Change language"),
         BotCommand("status", "Bot status"),
         BotCommand("help", "Help"),
         BotCommand("cancel", "Cancel current operation"),
@@ -322,18 +217,14 @@ def set_commands():
 # --- KEYBOARDS ---
 def get_language_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    keyboard.add(KeyboardButton("English"), KeyboardButton("Russian"))
+    keyboard.add(KeyboardButton("English"), KeyboardButton("Русский"))
     return keyboard
 
 def get_main_keyboard(lang='en'):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    keyboard.add(
-        KeyboardButton("/offer"),
-        KeyboardButton("/request"),
-        KeyboardButton("/marketplace"),
-        KeyboardButton("/profile"),
-        KeyboardButton("/help"),
-    )
+    buttons = ["/offer", "/request", "/marketplace", "/profile", "/help"]
+    for b in buttons:
+        keyboard.add(KeyboardButton(b))
     return keyboard
 
 def get_values_keyboard(lang='en'):
@@ -374,7 +265,7 @@ def cmd_start(message: Message):
     set_session(tg_id, 'language_select', {})
     bot.reply_to(
         message,
-        "Choose your language:\n\nEnglish / Russian",
+        "Choose your language:\n\nEnglish / Русский",
         reply_markup=get_language_keyboard()
     )
 
@@ -485,8 +376,21 @@ def cmd_marketplace(message: Message):
     lang = user.get('language', 'en')
     bot.reply_to(message, get_text(tg_id, 'marketplace_empty'))
 
+@bot.message_handler(commands=['language'])
+def cmd_language(message: Message):
+    """Change language"""
+    tg_id = message.from_user.id
+    logger.info(f"Received /language from {tg_id}")
+    
+    set_session(tg_id, 'language_select', {})
+    bot.reply_to(
+        message,
+        "Choose your language:\n\nEnglish / Русский",
+        reply_markup=get_language_keyboard()
+    )
+
 # --- LANGUAGE SELECTION ---
-@bot.message_handler(func=lambda message: message.text in ["English", "Russian"])
+@bot.message_handler(func=lambda message: message.text in ["English", "Русский"])
 def handle_language_selection(message: Message):
     tg_id = message.from_user.id
     text = message.text
@@ -503,14 +407,23 @@ def handle_language_selection(message: Message):
     if state == 'language_select':
         clear_session(tg_id)
     
-    bot.reply_to(
-        message,
-        TEXTS[lang]['language_set'] + "\n\n" + TEXTS[lang]['welcome'],
-        reply_markup=ReplyKeyboardRemove()
-    )
-    
-    set_session(tg_id, 'survey_name', {'language': lang})
-    bot.send_message(tg_id, TEXTS[lang]['name_ask'])
+    # Check if user already has a profile
+    user = get_user(tg_id)
+    if user and user.get('status') == 'completed':
+        bot.reply_to(
+            message,
+            TEXTS[lang]['language_changed'] + "\n\n" + TEXTS[lang]['welcome_citizen'].format(name=user.get('name', '')),
+            reply_markup=get_main_keyboard(lang)
+        )
+    else:
+        bot.reply_to(
+            message,
+            TEXTS[lang]['language_set'] + "\n\n" + TEXTS[lang]['welcome'],
+            reply_markup=ReplyKeyboardRemove()
+        )
+        
+        set_session(tg_id, 'survey_name', {'language': lang})
+        bot.send_message(tg_id, TEXTS[lang]['name_ask'])
 
 # --- SURVEY HANDLERS ---
 @bot.message_handler(func=lambda message: True, content_types=['text'])
