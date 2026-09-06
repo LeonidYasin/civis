@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Main Civis bot with proxy support and error handling.
-No emoji for Windows console compatibility.
+Main Civis bot with proxy support from .env
 """
 
 import asyncio
@@ -19,7 +18,12 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
 
-# --- LOGGING SETUP (no emoji) ---
+# Proxy support
+import aiohttp
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiohttp_socks import ProxyConnector
+
+# --- LOGGING ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -37,15 +41,41 @@ if not TOKEN:
     logger.error("Create .env file with: BOT_TOKEN=your_token")
     sys.exit(1)
 
-# --- PROXY CHECK ---
-http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
-https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
-if http_proxy or https_proxy:
-    logger.info(f"Using proxy: {https_proxy or http_proxy}")
-else:
-    logger.info("No proxy configured, direct connection")
+# --- PROXY SETUP ---
+def get_proxy_connector():
+    """Create proxy connector from .env or environment variables"""
+    # First check .env
+    proxy_url = os.getenv("PROXY_URL")
+    if proxy_url:
+        logger.info(f"Proxy from .env: {proxy_url}")
+        return ProxyConnector.from_url(proxy_url)
+    
+    # Then check system env
+    http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+    https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+    
+    if https_proxy:
+        logger.info(f"Proxy from HTTPS_PROXY: {https_proxy}")
+        return ProxyConnector.from_url(https_proxy)
+    elif http_proxy:
+        logger.info(f"Proxy from HTTP_PROXY: {http_proxy}")
+        return ProxyConnector.from_url(http_proxy)
+    
+    logger.info("No proxy configured, using direct connection")
+    return None
 
-# --- DATABASE (SQLite) ---
+# --- CREATE BOT SESSION ---
+def create_bot_session():
+    """Create bot with proxy support if configured"""
+    connector = get_proxy_connector()
+    if connector:
+        aiohttp_session = aiohttp.ClientSession(connector=connector)
+        aiogram_session = AiohttpSession(session=aiohttp_session)
+        return aiogram_session
+    else:
+        return None
+
+# --- DATABASE ---
 DB_PATH = Path(__file__).parent / "civis_data.db"
 
 def init_db():
@@ -132,7 +162,11 @@ format_keyboard = ReplyKeyboardMarkup(
 )
 
 # --- BOT INIT ---
-bot = Bot(token=TOKEN)
+session = create_bot_session()
+if session:
+    bot = Bot(token=TOKEN, session=session)
+else:
+    bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 # --- HANDLERS ---
@@ -251,11 +285,11 @@ async def main():
             logger.error(f"  DNS error: {dns_err}")
         
         # Proxy check
-        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
-        if http_proxy:
-            logger.error(f"  Proxy configured: {http_proxy}")
+        proxy_url = os.getenv("PROXY_URL")
+        if proxy_url:
+            logger.error(f"  Proxy configured in .env: {proxy_url}")
         else:
-            logger.error("  Proxy not configured")
+            logger.error("  Proxy not configured in .env")
         
         sys.exit(1)
 
