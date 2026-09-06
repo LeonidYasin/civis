@@ -186,12 +186,12 @@ async def process_format(message: types.Message, state: FSMContext):
 async def main():
     logging.basicConfig(level=logging.INFO)
     
-    # Создаём коннектор и сессию
+    # Создаём aiohttp.ClientSession с кастомным коннектором
     connector = get_proxy_connector()
-    session = AiohttpSession()
-    # В новой версии aiogram коннектор передаётся через aiohttp.ClientSession
-    # Используем параметр connector при создании сессии
-    # Но правильный способ: использовать Bot с session=session
+    client_session = aiohttp.ClientSession(connector=connector)
+    
+    # Передаём клиентскую сессию в AiohttpSession
+    session = AiohttpSession(aiohttp_client_session=client_session)
     bot = Bot(token=TOKEN, session=session)
     
     await dp.start_polling(bot)
