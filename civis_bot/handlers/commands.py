@@ -25,7 +25,6 @@ from keyboards import (
 from utils import get_text, get_embedding_profile
 from config import get_proxy_url
 
-# Import survey and language modules
 from .survey import handle_survey, set_bot as set_survey_bot
 from .language import handle_language_selection
 
@@ -392,11 +391,11 @@ def cmd_subscribe(message: Message):
     
     user = get_user(tg_id)
     if not user:
-        bot.reply_to(message, "❌ You don't have a profile yet. Use /start to create one!")
+        bot.reply_to(message, "You don't have a profile yet. Use /start to create one!")
         return
     
     if user.get('status') != 'completed':
-        bot.reply_to(message, "❌ Your profile is not complete. Use /start to complete it!")
+        bot.reply_to(message, "Your profile is not complete. Use /start to complete it!")
         return
     
     lang = user.get('language', 'en')
@@ -408,29 +407,29 @@ def cmd_subscribe(message: Message):
     remaining = get_matches_remaining(tg_id)
     remaining_text = str(remaining) if remaining != float('inf') else '∞'
     
-    text = f"""💳 **Subscription Plans**
+    text = f"""Subscription Plans
 
 Current plan: {sub['plan'].upper()}
 Matches remaining: {remaining_text}
 
-📌 **Free** — $0/month
+Free — $0/month
   • 3 matches/month
   • Basic profile
   • View citizens
 
-⭐ **Premium** — $9.99/month
+Premium — $9.99/month
   • Unlimited matches
   • Priority in search
   • Export profile (JSON)
   • Early access to new features
 
-🚀 **Lifetime** — $99 one-time
+Lifetime — $99 one-time
   • All Premium features
   • MCP tools access
   • Lifetime updates
 
 To upgrade, send /setkey to use your own OpenAI key, or contact @civis_support for payment."""
-    bot.reply_to(message, text, parse_mode='Markdown')
+    bot.reply_to(message, text)
 
 def cmd_setkey(message: Message):
     """Set OpenAI API key"""
@@ -445,18 +444,18 @@ def cmd_setkey(message: Message):
         bot.reply_to(
             message,
             "Please provide your OpenAI API key:\n"
-            "`/setkey sk-...`\n\n"
+            "/setkey sk-...\n\n"
             "You can get your key at: https://platform.openai.com/api-keys"
         )
         return
     
     key = parts[1]
     if not key.startswith('sk-') or len(key) < 20:
-        bot.reply_to(message, "❌ Invalid OpenAI key format. It should start with 'sk-'. Please check and try again.")
+        bot.reply_to(message, "Invalid OpenAI key format. It should start with 'sk-'. Please check and try again.")
         return
     
     save_openai_key(tg_id, key)
-    bot.reply_to(message, "✅ OpenAI key saved successfully! You can now use /match for AI-powered matching.")
+    bot.reply_to(message, "OpenAI key saved successfully! You can now use /match for AI-powered matching.")
 
 def cmd_match(message: Message):
     """AI-powered matching"""
@@ -470,8 +469,8 @@ def cmd_match(message: Message):
     if not openai_key:
         bot.reply_to(
             message,
-            "❌ You need to set your OpenAI API key first.\n"
-            "Use `/setkey sk-...` to set your key."
+            "You need to set your OpenAI API key first.\n"
+            "Use /setkey sk-... to set your key."
         )
         return
     
@@ -479,9 +478,9 @@ def cmd_match(message: Message):
         remaining = get_matches_remaining(tg_id)
         bot.reply_to(
             message,
-            f"❌ You've used all your free matches.\n"
+            f"You've used all your free matches.\n"
             f"Remaining: {remaining}\n"
-            "Use `/subscribe` to upgrade to Premium."
+            "Use /subscribe to upgrade to Premium."
         )
         return
     
@@ -508,7 +507,7 @@ About: {user.get('about_text', 'N/A')}"""
     
     bot.reply_to(
         message,
-        f"🔍 AI Matching in progress...\n\n"
+        f"AI Matching in progress...\n\n"
         f"Your profile:\n{user_profile}\n\n"
         f"We're analyzing {len(citizens_list)} other citizens.\n"
         f"Full AI matching coming soon!"
@@ -534,7 +533,7 @@ def cmd_search(message: Message):
         bot.reply_to(message, f"No citizens found matching '{query}'.")
         return
     
-    text = f"🔍 Search results for '{query}':\n\n"
+    text = f"Search results for '{query}':\n\n"
     for username, name, role, values, about in results[:20]:
         text += f"@{username or 'unknown'} - {name}\n"
         text += f"Role: {role}\nValues: {values}\n"
