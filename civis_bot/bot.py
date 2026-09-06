@@ -19,13 +19,11 @@ from aiogram.client.session.aiohttp import AiohttpSession
 
 def get_proxy_connector():
     """Создаёт прокси-коннектор из системных переменных или .env"""
-    # Сначала проверяем .env
     proxy_url = os.getenv("PROXY_URL")
     if proxy_url:
         from aiohttp_socks import ProxyConnector
         return ProxyConnector.from_url(proxy_url)
     
-    # Проверяем системные переменные (HTTP_PROXY/HTTPS_PROXY)
     http_proxy = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
     https_proxy = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
     
@@ -36,7 +34,6 @@ def get_proxy_connector():
         from aiohttp_socks import ProxyConnector
         return ProxyConnector.from_url(http_proxy)
     
-    # Если прокси нет — используем обычный IPv4
     return aiohttp.TCPConnector(family=socket.AF_INET)
 
 # --- ЗАГРУЗКА ПЕРЕМЕННЫХ ---
@@ -76,7 +73,6 @@ def save_profile(tg_user_id, tg_username, text, values, role, format):
     conn.commit()
     conn.close()
 
-# Инициализируем БД при старте
 init_db()
 
 # --- СОСТОЯНИЯ АНКЕТЫ ---
@@ -116,12 +112,8 @@ format_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# --- ИНИЦИАЛИЗАЦИЯ БОТА ---
-# Создаём бота внутри main(), чтобы коннектор создавался в event loop
-def create_bot():
-    connector = get_proxy_connector()
-    session = AiohttpSession(connector=connector)
-    return Bot(token=TOKEN, session=session)
+# --- ИНИЦИАЛИЗАЦИЯ ДИСПЕТЧЕРА ---
+dp = Dispatcher()
 
 # --- ХЕНДЛЕРЫ ---
 @dp.message(Command("start"))
@@ -169,7 +161,6 @@ async def process_format(message: types.Message, state: FSMContext):
     await state.update_data(format=message.text)
     data = await state.get_data()
 
-    # Сохраняем в SQLite
     try:
         save_profile(
             tg_user_id=str(message.from_user.id),
@@ -196,15 +187,9 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     
     # Создаём бота внутри event loop
-    bot = create_bot()
-    dp = Dispatcher()
-    
-    # Регистрируем хендлеры
-    dp.message.register(start, Command("start"))
-    dp.message.register(process_text, Form.text)
-    dp.message.register(process_values, Form.values)
-    dp.message.register(process_role, Form.role)
-    dp.message.register(process_format, Form.format)
+    connector = get_proxy_connector()
+    session = AiohttpSession(connector=connector)
+    bot = Bot(token=TOKEN, session=session)
     
     await dp.start_polling(bot)
 
