@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Database module for Civis bot.
-Handles all SQLite operations.
+Handles all SQLite operations for users, sessions, offers, requests, and subscriptions.
 """
 
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import logging
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path(__file__).parent / "civis_data.db"
 
 def init_db():
-    """Initialize database with all tables"""
+    """Initialize all database tables"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
@@ -31,17 +31,19 @@ def init_db():
             role TEXT,
             format TEXT,
             language TEXT DEFAULT 'en',
+            openai_key TEXT,
             status TEXT DEFAULT 'registered',
             created_at TEXT,
             updated_at TEXT
         )
     """)
     
+    # Add openai_key column if missing
     cur.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in cur.fetchall()]
-    if 'language' not in columns:
-        cur.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'en'")
-        logger.info("Added 'language' column to users table")
+    if 'openai_key' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN openai_key TEXT")
+        logger.info("Added 'openai_key' column to users table")
     
     # Sessions table
     cur.execute("""
@@ -73,24 +75,36 @@ def init_db():
         )
     """)
     
+    # Subscriptions table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            tg_id INTEGER PRIMARY KEY,
+            plan TEXT DEFAULT 'free',
+            valid_until TEXT,
+            matches_used INTEGER DEFAULT 0,
+            matches_limit INTEGER DEFAULT 3,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
+    
     conn.commit()
     conn.close()
     logger.info("Database initialized")
 
+# --- USER FUNCTIONS ---
 def get_user(tg_id):
-    """Get user data by tg_id"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
     row = cur.fetchone()
     conn.close()
     if row:
-        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'about_text', 'user_values', 'role', 'format', 'language', 'status', 'created_at', 'updated_at']
+        columns = ['tg_id', 'username', 'name', 'telegram_contact', 'about_text', 'user_values', 'role', 'format', 'language', 'openai_key', 'status', 'created_at', 'updated_at']
         return dict(zip(columns, row))
     return None
 
 def save_user(tg_id, username, **kwargs):
-    """Save or update user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
@@ -120,8 +134,20 @@ def save_user(tg_id, username, **kwargs):
     conn.commit()
     conn.close()
 
+def save_openai_key(tg_id, key):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET openai_key = ?, updated_at = ? WHERE tg_id = ?",
+                 (key, datetime.now().isoformat(), tg_id))
+    conn.commit()
+    conn.close()
+
+def get_openai_key(tg_id):
+    user = get_user(tg_id)
+    return user.get('openai_key') if user else None
+
+# --- SESSION FUNCTIONS ---
 def get_session(tg_id):
-    """Get session state for user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT state, data FROM sessions WHERE tg_id = ?", (tg_id,))
@@ -132,7 +158,6 @@ def get_session(tg_id):
     return None, {}
 
 def set_session(tg_id, state, data=None):
-    """Set session state for user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     data_json = json.dumps(data or {})
@@ -144,16 +169,14 @@ def set_session(tg_id, state, data=None):
     conn.close()
 
 def clear_session(tg_id):
-    """Clear session for user"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM sessions WHERE tg_id = ?", (tg_id,))
     conn.commit()
     conn.close()
 
-# --- OFFERS AND REQUESTS ---
+# --- OFFER FUNCTIONS ---
 def save_offer(tg_id, text):
-    """Save an offer"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("INSERT INTO offers (tg_id, text, created_at) VALUES (?, ?, ?)",
@@ -161,44 +184,7 @@ def save_offer(tg_id, text):
     conn.commit()
     conn.close()
 
-def save_request(tg_id, text):
-    """Save a request"""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("INSERT INTO requests (tg_id, text, created_at) VALUES (?, ?, ?)",
-                 (tg_id, text, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-def get_all_citizens():
-    """Get all users with completed profiles"""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT username, name, role, user_values FROM users WHERE status = 'completed'")
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-def get_my_offers(tg_id):
-    """Get offers by user"""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, text, created_at FROM offers WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
-def get_my_requests(tg_id):
-    """Get requests by user"""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("SELECT id, text, created_at FROM requests WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return rows
-
 def get_all_offers():
-    """Get all offers"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT tg_id, text, created_at FROM offers ORDER BY created_at DESC")
@@ -206,11 +192,124 @@ def get_all_offers():
     conn.close()
     return rows
 
+def get_my_offers(tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, text, created_at FROM offers WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def delete_offer(offer_id, tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM offers WHERE id = ? AND tg_id = ?", (offer_id, tg_id))
+    conn.commit()
+    conn.close()
+
+# --- REQUEST FUNCTIONS ---
+def save_request(tg_id, text):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO requests (tg_id, text, created_at) VALUES (?, ?, ?)",
+                 (tg_id, text, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
 def get_all_requests():
-    """Get all requests"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT tg_id, text, created_at FROM requests ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     return rows
+
+def get_my_requests(tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT id, text, created_at FROM requests WHERE tg_id = ? ORDER BY created_at DESC", (tg_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def delete_request(req_id, tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM requests WHERE id = ? AND tg_id = ?", (req_id, tg_id))
+    conn.commit()
+    conn.close()
+
+# --- CITIZEN FUNCTIONS ---
+def get_all_citizens():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT username, name, role, user_values FROM users WHERE status = 'completed'")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+# --- SUBSCRIPTION FUNCTIONS ---
+def get_subscription(tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM subscriptions WHERE tg_id = ?", (tg_id,))
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        columns = ['tg_id', 'plan', 'valid_until', 'matches_used', 'matches_limit', 'created_at', 'updated_at']
+        return dict(zip(columns, row))
+    return None
+
+def create_subscription(tg_id, plan='free', matches_limit=3):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT OR REPLACE INTO subscriptions (tg_id, plan, valid_until, matches_used, matches_limit, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (tg_id, plan, None, 0, matches_limit, datetime.now().isoformat(), datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def update_subscription_plan(tg_id, plan, matches_limit=None):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if matches_limit is None:
+        matches_limit = 999 if plan == 'premium' else 3 if plan == 'free' else 3
+    cur.execute("""
+        UPDATE subscriptions SET plan = ?, matches_limit = ?, updated_at = ?
+        WHERE tg_id = ?
+    """, (plan, matches_limit, datetime.now().isoformat(), tg_id))
+    conn.commit()
+    conn.close()
+
+def increment_matches_used(tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("UPDATE subscriptions SET matches_used = matches_used + 1, updated_at = ? WHERE tg_id = ?",
+                 (datetime.now().isoformat(), tg_id))
+    conn.commit()
+    conn.close()
+
+def can_use_match(tg_id):
+    sub = get_subscription(tg_id)
+    if not sub:
+        create_subscription(tg_id)
+        sub = get_subscription(tg_id)
+    
+    # Check if premium or has matches left
+    if sub['plan'] == 'premium':
+        return True
+    
+    # Free plan: check limit
+    return sub['matches_used'] < sub['matches_limit']
+
+def get_matches_remaining(tg_id):
+    sub = get_subscription(tg_id)
+    if not sub:
+        create_subscription(tg_id)
+        sub = get_subscription(tg_id)
+    
+    if sub['plan'] == 'premium':
+        return float('inf')
+    
+    return max(0, sub['matches_limit'] - sub['matches_used'])
