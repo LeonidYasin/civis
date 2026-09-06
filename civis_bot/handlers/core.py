@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Core command handlers for Civis bot.
-Contains: start, profile, embedding, citizens, help, survey, status, cancel, done, language
+Contains: start, menu, profile, embedding, citizens, help, survey, status, cancel, done, language
 """
 
 import logging
@@ -47,6 +47,42 @@ def cmd_start(message: Message):
         message,
         "Choose your language:\n\nEnglish / Русский",
         reply_markup=get_language_keyboard()
+    )
+
+def cmd_menu(message: Message):
+    """Show main menu"""
+    log_message(message, "[CMD]")
+    tg_id = message.from_user.id
+    user = get_user(tg_id)
+    if not user or user.get('status') != 'completed':
+        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+        return
+    
+    lang = user.get('language', 'en')
+    text = "📋 **Main Menu**\n\n"
+    text += "Use the buttons below or type commands:\n\n"
+    text += "`/offer` - Publish an offer\n"
+    text += "`/request` - Publish a request\n"
+    text += "`/my_offers` - View your offers\n"
+    text += "`/my_requests` - View your requests\n"
+    text += "`/delete_offer` - Delete your offer\n"
+    text += "`/delete_request` - Delete your request\n"
+    text += "`/marketplace` - View marketplace\n"
+    text += "`/profile` - View your profile\n"
+    text += "`/embedding` - View AI embedding profile\n"
+    text += "`/citizens` - List all citizens\n"
+    text += "`/search` - Search citizens\n"
+    text += "`/subscribe` - View subscription plans\n"
+    text += "`/match` - AI-powered matching\n"
+    text += "`/language` - Change language\n"
+    text += "`/support` - Contact developer\n"
+    text += "`/help` - Help"
+    
+    bot.reply_to(
+        message,
+        text,
+        parse_mode='Markdown',
+        reply_markup=get_main_keyboard(lang)
     )
 
 def cmd_profile(message: Message):
