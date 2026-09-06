@@ -95,10 +95,10 @@ def register_handlers():
     bot.message_handler(commands=['support'])(cmd_support)
     bot.message_handler(commands=['search'])(cmd_search)
     
-    # Language selection handler
+    # Language selection handler - MUST be registered BEFORE survey handler
     bot.message_handler(func=lambda m: m.text in ["English", "Русский"])(handle_language_selection)
     
-    # Survey state handler (catch-all for text messages)
+    # Survey state handler (catch-all for text messages - MUST be LAST)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
     
     logger.info("All handlers registered")
