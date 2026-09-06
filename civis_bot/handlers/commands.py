@@ -26,7 +26,7 @@ from utils import get_text, get_embedding_profile
 from config import get_proxy_url
 
 from .survey import handle_survey, set_bot as set_survey_bot
-from .language import handle_language_selection
+from .language import handle_language_selection, set_bot as set_language_bot
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,9 @@ bot = None
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
-    # Also set bot in survey module
+    # Also set bot in survey and language modules
     set_survey_bot(bot_instance)
+    set_language_bot(bot_instance)
 
 # --- REGISTRATION ---
 
