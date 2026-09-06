@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/splash_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/form_personal_screen.dart';
+import 'screens/form_about_screen.dart';
+import 'screens/form_values_screen.dart';
+import 'screens/form_role_screen.dart';
+import 'models/profile_database.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+void main() {
   runApp(const CivisApp());
 }
 
@@ -19,8 +23,16 @@ class CivisApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const SplashScreen(),
-      debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const SplashScreen(),
+        '/welcome': (context) => const WelcomeScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/form/personal': (context) => const FormPersonalScreen(),
+        '/form/about': (context) => const FormAboutScreen(),
+        '/form/values': (context) => const FormValuesScreen(),
+        '/form/role': (context) => const FormRoleScreen(),
+      },
     );
   }
 }
