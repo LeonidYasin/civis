@@ -9,14 +9,19 @@ import signal
 import time
 import os
 import threading
+import ssl
+import urllib3
 
 import requests
 from telebot import TeleBot
-from telebot.types import BotCommand, CallbackQuery, Message
+from telebot.types import BotCommand, CallbackQuery
 
 from config import TOKEN, get_proxy_url
 from database import init_db
 from handlers import register_handlers, set_bot
+
+# Disable SSL warnings for testing
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- LOGGING ---
 # Force UTF-8 encoding for Windows console
@@ -60,11 +65,14 @@ signal.signal(signal.SIGTERM, signal_handler)
 # --- CREATE BOT ---
 proxy_url = get_proxy_url()
 if proxy_url:
+    # Create session with proxy and disable SSL verification
     session = requests.Session()
     session.proxies = {'http': proxy_url, 'https': proxy_url}
+    session.verify = False  # Disable SSL verification for testing
+    
     bot = TeleBot(token=TOKEN, threaded=False)
     bot.session = session
-    logger.info(f"Bot created with proxy: {proxy_url}")
+    logger.info(f"Bot created with proxy: {proxy_url} (SSL verification disabled)")
 else:
     bot = TeleBot(token=TOKEN, threaded=False)
     logger.info("Bot created without proxy")
@@ -78,7 +86,6 @@ def handle_callback(call: CallbackQuery):
     """Handle inline keyboard button clicks — execute command immediately"""
     data = call.data
     
-    # Map callback data to commands
     command_map = {
         'offer': '/offer',
         'request': '/request',
@@ -107,23 +114,17 @@ def handle_callback(call: CallbackQuery):
         bot.answer_callback_query(call.id, "Unknown action")
         return
     
-    # Answer callback to remove loading state
     bot.answer_callback_query(call.id)
-    
-    # Get the command
     cmd = command_map[data]
-    
-    # Get the original message ID for reply_to
     original_msg_id = call.message.message_id
     
-    # Create a proper Message-like object with all required attributes
     class FakeMessage:
         def __init__(self, text, from_user, chat, message_id):
             self.text = text
             self.from_user = from_user
             self.chat = chat
             self.content_type = 'text'
-            self.message_id = message_id  # Use real message_id from callback
+            self.message_id = message_id
             self.reply_to_message = None
             self.date = int(time.time())
             self.entities = None
@@ -160,17 +161,14 @@ def handle_callback(call: CallbackQuery):
         message_id=original_msg_id
     )
     
-    # Process the command using bot's message handler
     try:
         bot.process_new_messages([fake_msg])
     except Exception as e:
         logger.error(f"Error processing callback command {cmd}: {e}")
-        # Send a new message instead of replying
         bot.send_message(call.message.chat.id, f"Error: {e}")
 
 # --- SET COMMANDS MENU (left sidebar) ---
 def set_commands_menu():
-    """Set the bot commands menu (visible when typing /)"""
     commands = [
         BotCommand("start", "Create or view your profile"),
         BotCommand("menu", "Show main menu"),
