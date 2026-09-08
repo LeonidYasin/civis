@@ -5,22 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Civis — Республика с AI-коммуникацией</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #0b0d10;
             color: #e4e6eb;
             line-height: 1.6;
         }
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 24px;
-        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
         header {
             padding: 40px 0 20px;
             border-bottom: 1px solid #1e2330;
@@ -29,15 +21,8 @@
             align-items: center;
             flex-wrap: wrap;
         }
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: #fff;
-            letter-spacing: -0.5px;
-        }
-        .logo span {
-            color: #6c8cff;
-        }
+        .logo { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+        .logo span { color: #6c8cff; }
         .badge {
             background: #1e2330;
             padding: 6px 16px;
@@ -46,10 +31,7 @@
             color: #8b95a9;
             border: 1px solid #2a3142;
         }
-        .hero {
-            padding: 60px 0;
-            text-align: center;
-        }
+        .hero { padding: 60px 0; text-align: center; }
         .hero h1 {
             font-size: 48px;
             font-weight: 800;
@@ -88,49 +70,16 @@
             transition: all 0.2s;
             display: inline-block;
         }
-        .btn-primary {
-            background: #6c8cff;
-            color: #fff;
-        }
-        .btn-primary:hover {
-            background: #5a7ae6;
-            transform: translateY(-2px);
-        }
-        .btn-secondary {
-            background: #1e2330;
-            color: #e4e6eb;
-            border: 1px solid #2a3142;
-        }
-        .btn-secondary:hover {
-            background: #2a3142;
-        }
-        .btn-outline {
-            background: transparent;
-            color: #8b95a9;
-            border: 1px solid #2a3142;
-        }
-        .btn-outline:hover {
-            border-color: #6c8cff;
-            color: #fff;
-        }
-        .section {
-            padding: 60px 0;
-            border-top: 1px solid #1e2330;
-        }
-        .section h2 {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #fff;
-        }
-        .section h2 span {
-            color: #6c8cff;
-        }
-        .section .desc {
-            color: #8b95a9;
-            font-size: 18px;
-            max-width: 640px;
-        }
+        .btn-primary { background: #6c8cff; color: #fff; }
+        .btn-primary:hover { background: #5a7ae6; transform: translateY(-2px); }
+        .btn-secondary { background: #1e2330; color: #e4e6eb; border: 1px solid #2a3142; }
+        .btn-secondary:hover { background: #2a3142; }
+        .btn-outline { background: transparent; color: #8b95a9; border: 1px solid #2a3142; }
+        .btn-outline:hover { border-color: #6c8cff; color: #fff; }
+        .section { padding: 60px 0; border-top: 1px solid #1e2330; }
+        .section h2 { font-size: 32px; font-weight: 700; margin-bottom: 12px; color: #fff; }
+        .section h2 span { color: #6c8cff; }
+        .section .desc { color: #8b95a9; font-size: 18px; max-width: 640px; }
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -144,24 +93,10 @@
             border: 1px solid #1e2330;
             transition: border-color 0.2s;
         }
-        .card:hover {
-            border-color: #2a3142;
-        }
-        .card .emoji {
-            font-size: 32px;
-            margin-bottom: 12px;
-            display: block;
-        }
-        .card h3 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #fff;
-        }
-        .card p {
-            color: #8b95a9;
-            font-size: 15px;
-        }
+        .card:hover { border-color: #2a3142; }
+        .card .emoji { font-size: 32px; margin-bottom: 12px; display: block; }
+        .card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+        .card p { color: #8b95a9; font-size: 15px; }
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -179,9 +114,7 @@
             font-size: 15px;
             color: #c8ccd4;
         }
-        .feature-item .icon {
-            font-size: 20px;
-        }
+        .feature-item .icon { font-size: 20px; }
         .commands {
             background: #0d0f15;
             padding: 24px;
@@ -193,24 +126,11 @@
             color: #8b95a9;
             overflow-x: auto;
         }
-        .commands .cmd {
-            color: #a78bfa;
-        }
-        .commands .desc {
-            color: #5a647a;
-        }
-        .cta {
-            text-align: center;
-            padding: 40px 0;
-        }
-        .cta h2 {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-        .cta p {
-            color: #8b95a9;
-            margin-bottom: 24px;
-        }
+        .commands .cmd { color: #a78bfa; }
+        .commands .desc { color: #5a647a; }
+        .cta { text-align: center; padding: 40px 0; }
+        .cta h2 { font-size: 32px; margin-bottom: 8px; }
+        .cta p { color: #8b95a9; margin-bottom: 24px; }
         footer {
             padding: 32px 0;
             border-top: 1px solid #1e2330;
@@ -221,14 +141,8 @@
             color: #5a647a;
             font-size: 14px;
         }
-        footer a {
-            color: #6c8cff;
-            text-decoration: none;
-        }
-        footer a:hover {
-            text-decoration: underline;
-        }
-        /* Comparison table */
+        footer a { color: #6c8cff; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
         .comparison {
             margin-top: 32px;
             overflow-x: auto;
@@ -251,42 +165,33 @@
             border-bottom: 1px solid #1e2330;
             color: #c8ccd4;
         }
-        .comparison .old {
-            color: #8b95a9;
+        .comparison .old { color: #8b95a9; }
+        .comparison .new { color: #6c8cff; font-weight: 500; }
+        .comparison .check { color: #34d399; font-weight: 700; }
+        .comparison tr:hover td { background: #13171f; }
+        .comparison .highlight { border-left: 3px solid #6c8cff; }
+        .republic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-top: 24px;
         }
-        .comparison .new {
-            color: #6c8cff;
-            font-weight: 500;
-        }
-        .comparison .check {
-            color: #34d399;
-            font-weight: 700;
-        }
-        .comparison tr:hover td {
+        .republic-card {
             background: #13171f;
+            padding: 24px;
+            border-radius: 14px;
+            border: 1px solid #1e2330;
+            text-align: center;
         }
-        .comparison .highlight {
-            border-left: 3px solid #6c8cff;
-        }
+        .republic-card .icon { font-size: 32px; display: block; margin-bottom: 8px; }
+        .republic-card h4 { color: #fff; font-size: 17px; margin-bottom: 4px; }
+        .republic-card p { color: #8b95a9; font-size: 14px; }
         @media (max-width: 600px) {
-            .hero h1 {
-                font-size: 32px;
-            }
-            .hero p {
-                font-size: 17px;
-            }
-            header {
-                flex-direction: column;
-                gap: 12px;
-                align-items: flex-start;
-            }
-            .comparison table {
-                font-size: 13px;
-            }
-            .comparison th,
-            .comparison td {
-                padding: 10px 12px;
-            }
+            .hero h1 { font-size: 32px; }
+            .hero p { font-size: 17px; }
+            header { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .comparison table { font-size: 13px; }
+            .comparison th, .comparison td { padding: 10px 12px; }
         }
     </style>
 </head>
@@ -298,25 +203,25 @@
         </header>
 
         <section class="hero">
-            <h1>Говори с AI — он сделает всё остальное</h1>
+            <h1>Говори с AI — он уберёт трение между людьми</h1>
             <p>
-                Один AI-интерфейс вместо 10 приложений. <br>
-                Такси, недвижимость, работа, товары, знакомства — без форм, без спама, без трения.
+                Такси, недвижимость, работа, товары, знакомства, инвестиции — <br>
+                без анкет, без спама, без холодных контактов. Просто диалог с AI.
             </p>
             <div class="buttons">
                 <a href="https://t.me/civis_matcher_bot" class="btn btn-primary">🤖 Начать в Telegram</a>
                 <a href="https://github.com/LeonidYasin/civis" class="btn btn-secondary">📦 GitHub</a>
             </div>
             <p class="sub">
-                👥 1+ граждан · 🧠 AI-матчинг · 💬 Естественный язык · 🏛️ Республиканские институты
+                👥 1+ граждан · 🧠 AI-матчинг · 💬 Естественный язык · 🏛️ Республика
             </p>
         </section>
 
-        <!-- REPLACES 10 APPS SECTION -->
+        <!-- SECTION 1: REPLACES 10 APPS -->
         <section class="section">
             <h2>Вместо <span>10 приложений</span></h2>
             <p class="desc">
-                Civis заменяет такси, Авито, HH, Tinder, Циан и другие сервисы. Один AI-диалог — и всё.
+                Civis убирает трение в контактах между людьми. Один AI-диалог заменяет десятки сервисов.
             </p>
             <div class="comparison">
                 <table>
@@ -366,46 +271,40 @@
             </p>
         </section>
 
+        <!-- SECTION 2: REPUBLIC WITH AI COMMUNICATION -->
         <section class="section">
-            <h2>Зачем <span>Civis</span></h2>
+            <h2>Республика с <span>AI-коммуникацией</span></h2>
             <p class="desc">
-                В мире, где связи решают всё, мы убрали трение между вопросом и ответом.
-                Ты просто говоришь с ИИ — он понимает, что тебе нужно, и находит тех, кто может помочь.
+                Civis — это не просто маркетплейс. Это цифровая республика с собственными институтами, где AI выступает посредником и модератором всех взаимодействий.
             </p>
-            <div class="grid">
-                <div class="card">
-                    <span class="emoji">🧠</span>
-                    <h3>AI-матчинг</h3>
-                    <p>Не ключевые слова, а смысл. ИИ понимает твой профиль и находит совместимых людей — по ценностям, целям и навыкам.</p>
+            <div class="republic-grid">
+                <div class="republic-card">
+                    <span class="icon">🪪</span>
+                    <h4>Гражданство</h4>
+                    <p>Статус гражданина через поручительство и активность.</p>
                 </div>
-                <div class="card">
-                    <span class="emoji">💬</span>
-                    <h3>Естественный диалог</h3>
-                    <p>Никаких анкет. Ты просто рассказываешь о себе в чате, а бот сам строит твой профиль и ищет связи.</p>
+                <div class="republic-card">
+                    <span class="icon">⚖️</span>
+                    <h4>Суд</h4>
+                    <p>Децентрализованный арбитраж споров через граждан-судей.</p>
                 </div>
-                <div class="card">
-                    <span class="emoji">🛒</span>
-                    <h3>Маркетплейс</h3>
-                    <p>Публикуй предложения и запросы — от услуг до недвижимости. Всё в одном месте, с категориями и поиском.</p>
+                <div class="republic-card">
+                    <span class="icon">🗳️</span>
+                    <h4>Парламент</h4>
+                    <p>Голосования за законы, правила и развитие платформы.</p>
                 </div>
-                <div class="card">
-                    <span class="emoji">🔐</span>
-                    <h3>Конфиденциальность</h3>
-                    <p>Контакт раскрывается только по взаимному согласию. Твой профиль — твой актив.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">🏛️</span>
-                    <h3>Республика</h3>
-                    <p>Гражданство, суд, парламент — полноценные институты внутри бота. Сообщество управляет собой через голосования.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">🤖</span>
-                    <h3>AI-посредник</h3>
-                    <p>Все сообщения проходят через AI. Никакого спама, никаких мошенников. Только безопасные, осмысленные контакты.</p>
+                <div class="republic-card">
+                    <span class="icon">👥</span>
+                    <h4>Правительство</h4>
+                    <p>Избранные граждане управляют платформой и казной.</p>
                 </div>
             </div>
+            <p style="color: #5a647a; margin-top: 16px; font-size: 14px;">
+                🧠 AI-агент — нейтральный исполнитель всех институтов.
+            </p>
         </section>
 
+        <!-- SECTION 3: FEATURES -->
         <section class="section">
             <h2>Что умеет <span>бот</span></h2>
             <div class="features-grid">
@@ -417,9 +316,9 @@
                 <div class="feature-item"><span class="icon">💳</span> Подписки</div>
                 <div class="feature-item"><span class="icon">📂</span> Загрузка диалогов с ИИ</div>
                 <div class="feature-item"><span class="icon">🌐</span> EN / RU</div>
-                <div class="feature-item"><span class="icon">🏛️</span> Гражданство</div>
-                <div class="feature-item"><span class="icon">⚖️</span> Суд (арбитраж)</div>
-                <div class="feature-item"><span class="icon">🗳️</span> Парламент (голосования)</div>
+                <div class="feature-item"><span class="icon">🪪</span> Гражданство</div>
+                <div class="feature-item"><span class="icon">⚖️</span> Суд</div>
+                <div class="feature-item"><span class="icon">🗳️</span> Парламент</div>
             </div>
             <div class="commands">
                 <span class="cmd">/start</span> <span class="desc">— Создать профиль</span><br>
@@ -431,27 +330,6 @@
                 <span class="cmd">/upload_dialog</span> <span class="desc">— Загрузить историю диалогов</span><br>
                 <span class="cmd">/citizenship</span> <span class="desc">— Статус гражданина</span><br>
                 <span class="cmd">/arbitrate</span> <span class="desc">— Запустить арбитраж</span>
-            </div>
-        </section>
-
-        <section class="section">
-            <h2>Для <span>кого</span></h2>
-            <div class="grid">
-                <div class="card">
-                    <span class="emoji">🧑‍💻</span>
-                    <h3>Тестеры</h3>
-                    <p>Попробуй бота первым, найди баги, предложи идеи. Твоя обратная связь формирует продукт.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">👥</span>
-                    <h3>Пользователи</h3>
-                    <p>Создай профиль, находи людей, публикуй предложения. Бот уже работает и ждёт тебя.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">💰</span>
-                    <h3>Инвесторы</h3>
-                    <p>Ранний проект с архитектурой на основе MCP, AI-агентами и двухсторонним рынком. Пиши в поддержку бота.</p>
-                </div>
             </div>
         </section>
 
