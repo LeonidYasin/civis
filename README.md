@@ -1,191 +1,256 @@
-# Civis — Republic of Professionals
+# Civis — Республика профессионалов
 
-Civis is a community-driven platform where professionals connect based on trust, values, and shared goals. The project is divided into two main components:
-
-1. **Telegram Bot** — MVP for citizen registration, marketplace, and AI-powered matching.
-2. **MCP Server** — Model Context Protocol server for AI-agent integrations.
+**Civis** — это Telegram-бот для поиска и установления связей между людьми на основе их ценностей, целей и профессиональных паттернов. Бот использует AI-матчинг для поиска совместимых людей и позволяет публиковать предложения и запросы (услуги, недвижимость, такси, доставка и т.д.).
 
 ---
 
-## 🚀 Features
+## 🚀 Установка на свежий VPS (Ubuntu/Debian)
 
-### Telegram Bot (MVP)
-
-- **Registration** — Multi-step onboarding (name, about, values, role, format)
-- **Multilingual** — English and Russian support
-- **Profile Management** — View and update your profile
-- **Citizens List** — Browse all registered citizens
-- **Marketplace** — Publish and browse offers and requests
-- **AI Matching** — Semantic search and recommendations via embeddings
-- **Subscription Plans** — Free, Premium ($9.99/mo), Lifetime ($99)
-- **Support** — Contact developer directly via `/support`
-- **Admin Notifications** — Support messages forwarded to the admin group
-
-### MCP Server
-
-- **GitHub Actions Tools** — List workflow runs, get latest run ID, fetch logs by step
-- **Synapse Protocol** — Publish profiles, search people, propose contacts, index GitHub
-
----
-
-## 🛠 Tech Stack
-
-- **Bot** — Python 3.10+, pyTelegramBotAPI, SQLite
-- **AI** — OpenAI API (embeddings, matching)
-- **MCP** — Flask-based MCP server with auto-discovery
-- **Deployment** — GitHub Actions, Docker (optional)
-
----
-
-## 📁 Project Structure
-
-```
-civis/
-├── civis_bot/                 # Telegram Bot
-│   ├── bot.py                 # Entry point
-│   ├── config.py              # Configuration & env
-│   ├── database.py            # SQLite operations
-│   ├── handlers/              # Command handlers (modular)
-│   │   ├── commands.py        # All bot commands
-│   │   ├── survey.py          # Registration flow
-│   │   └── language.py        # Language selection
-│   ├── keyboards.py           # Reply keyboards
-│   ├── locales.py             # i18n (EN/RU)
-│   ├── utils.py               # Helpers (embeddings, matching)
-│   └── .env.example           # Environment template
-├── mcp_server/                # MCP Server
-│   ├── app.py                 # Flask app
-│   ├── tools/                 # Auto-discovered tools
-│   │   ├── github/            # GitHub Actions tools
-│   │   └── synapse/           # Synapse protocol tools
-│   └── requirements.txt
-├── CHANGELOG.md               # Version history
-├── CONTRIBUTING.md            # Contribution guidelines
-└── README.md                  # This file
-```
-
----
-
-## 🚦 Getting Started
-
-### Prerequisites
-
-- Python 3.10+
-- Telegram Bot Token (from @BotFather)
-- OpenAI API Key (optional, for AI matching)
-
-### Installation
+### 1. Подготовка системы
 
 ```bash
-# Clone the repository
+# Обновление пакетов
+sudo apt update && sudo apt upgrade -y
+
+# Установка Python и pip
+sudo apt install -y python3 python3-pip python3-venv git
+
+# Установка screen (для запуска в фоне)
+sudo apt install -y screen
+
+# Проверка версий
+python3 --version
+pip3 --version
+```
+
+### 2. Клонирование репозитория
+
+```bash
 git clone https://github.com/LeonidYasin/civis.git
-cd civis
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment file
-cp civis_bot/.env.example civis_bot/.env
-
-# Edit .env with your tokens
-nano civis_bot/.env
+cd civis/civis_bot
 ```
 
-### Running the Bot
+### 3. Настройка виртуального окружения
 
 ```bash
-cd civis_bot
+# Создание виртуального окружения
+python3 -m venv venv
+
+# Активация
+source venv/bin/activate
+```
+
+### 4. Установка зависимостей
+
+```bash
+pip install -r requirements.txt
+```
+
+Если `requirements.txt` нет, установи вручную:
+
+```bash
+pip install pyTelegramBotAPI requests python-dotenv
+```
+
+### 5. Настройка переменных окружения
+
+```bash
+# Копирование примера
+cp .env.example .env
+
+# Редактирование
+nano .env
+```
+
+Заполни `.env`:
+
+```env
+BOT_TOKEN=ваш_токен_от_BotFather
+ADMIN_CHAT_ID=-1001234567890  # ID группы для поддержки (с минусом)
+# PROXY_URL=http://127.0.0.1:10809  # Если нужен прокси
+```
+
+### 6. Запуск бота
+
+#### Вариант А: Вручную (для теста)
+
+```bash
 python bot.py
 ```
 
-### Running the MCP Server
+#### Вариант Б: В фоне через screen (рекомендуется)
 
 ```bash
-cd mcp_server
-python app.py
+# Запуск screen сессии
+screen -S civis
+
+# Внутри screen запускаем бота
+source venv/bin/activate
+python bot.py
+
+# Отключиться от screen: Ctrl+A, затем D
+# Подключиться обратно: screen -r civis
+```
+
+#### Вариант В: Автозапуск через systemd (для продакшена)
+
+Создай файл `/etc/systemd/system/civis-bot.service`:
+
+```ini
+[Unit]
+Description=Civis Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/civis/civis_bot
+ExecStart=/root/civis/civis_bot/venv/bin/python /root/civis/civis_bot/bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Запуск:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable civis-bot
+sudo systemctl start civis-bot
+sudo systemctl status civis-bot
+
+# Логи
+sudo journalctl -u civis-bot -f
 ```
 
 ---
 
-## 🤖 Bot Commands
+## 📁 Структура проекта
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Create or view your profile |
-| `/menu` | Show main menu |
-| `/profile` | View your profile |
-| `/embedding` | View your AI embedding profile |
-| `/citizens` | List all citizens |
-| `/search` | Search citizens |
-| `/offer` | Publish an offer |
-| `/request` | Publish a request |
-| `/my_offers` | View your offers |
-| `/my_requests` | View your requests |
-| `/delete_offer` | Delete your offer by ID |
-| `/delete_request` | Delete your request by ID |
-| `/marketplace` | View marketplace |
-| `/subscribe` | View subscription plans |
-| `/match` | AI-powered matching |
-| `/setkey` | Set OpenAI API key |
-| `/language` | Change language |
-| `/support` | Contact developer support |
-| `/status` | Bot status |
-| `/help` | Help |
-| `/cancel` | Cancel current operation |
-| `/done` | Finish value selection |
+```
+civis/
+├── civis_bot/                 # Telegram-бот
+│   ├── bot.py                 # Точка входа
+│   ├── config.py              # Конфигурация
+│   ├── database.py            # Работа с SQLite
+│   ├── handlers/              # Обработчики команд
+│   │   ├── core.py            # Основные команды
+│   │   ├── marketplace.py     # Предложения и запросы
+│   │   ├── dialogs.py         # Загрузка диалогов
+│   │   ├── subscription.py    # Подписки и AI-матчинг
+│   │   └── ...
+│   ├── keyboards.py           # Клавиатуры
+│   ├── locales.py             # Переводы (EN/RU)
+│   ├── utils.py               # Вспомогательные функции
+│   ├── requirements.txt
+│   └── .env.example
+├── docs/                      # Лендинг (GitHub Pages)
+└── README.md
+```
 
 ---
 
-## 💰 Subscription Plans
+## 🤖 Команды бота
 
-| Plan | Price | Features |
-|------|-------|----------|
-| Free | $0/mo | 3 matches/month, basic profile, view citizens |
-| Premium | $9.99/mo | Unlimited matches, priority search, profile export, early access |
-| Lifetime | $99 one-time | All Premium features + MCP tools access + lifetime updates |
+| Команда | Описание |
+|---------|----------|
+| `/start` | Создать или просмотреть профиль |
+| `/menu` | Показать главное меню |
+| `/profile` | Просмотреть профиль |
+| `/embedding` | Просмотреть AI-эмбеддинг профиля |
+| `/citizens` | Список всех граждан |
+| `/search` | Поиск граждан |
+| `/offer` | Опубликовать предложение |
+| `/request` | Опубликовать запрос |
+| `/offer_real_estate` | Быстрое предложение недвижимости |
+| `/offer_taxi` | Быстрое предложение такси |
+| `/offer_delivery` | Быстрое предложение доставки |
+| `/my_offers` | Мои предложения |
+| `/my_requests` | Мои запросы |
+| `/delete_offer` | Удалить предложение по ID |
+| `/delete_request` | Удалить запрос по ID |
+| `/marketplace` | Просмотр маркетплейса |
+| `/subscribe` | Тарифы |
+| `/match` | AI-матчинг |
+| `/setkey` | Установить OpenAI API ключ |
+| `/upload_dialog` | Загрузить историю диалогов |
+| `/my_dialogs` | Список загруженных диалогов |
+| `/process_dialogs` | Обработать диалоги |
+| `/language` | Сменить язык |
+| `/support` | Связаться с разработчиком |
+| `/status` | Статус бота |
+| `/help` | Помощь |
+| `/cancel` | Отменить текущую операцию |
+| `/done` | Завершить выбор ценностей |
 
 ---
 
-## 🧠 AI Matching
+## 🧠 AI-матчинг
 
-Civis uses OpenAI embeddings to match users based on their profile text:
+Civis использует OpenAI эмбеддинги или локальную модель `all-MiniLM-L6-v2` для поиска совместимых людей. Для работы нужно:
 
-1. User sets OpenAI API key via `/setkey`
-2. Profiles are converted to embeddings
-3. `/match` finds semantically similar profiles
-4. Results show match score and profile details
-
----
-
-## 🤝 Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+1. Установить OpenAI API ключ через `/setkey` (опционально, если используешь OpenAI)
+2. Для локальной модели установить `sentence-transformers`:
+   ```bash
+   pip install sentence-transformers
+   ```
 
 ---
 
-## 📝 Changelog
+## 📊 База данных
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+Бот использует SQLite (`civis_data.db`). Основные таблицы:
+
+| Таблица | Назначение |
+|---------|------------|
+| `users` | Профили граждан |
+| `offers` | Предложения (маркетплейс) |
+| `requests` | Запросы (маркетплейс) |
+| `subscriptions` | Подписки и лимиты |
+| `dialog_files` | Загруженные истории диалогов |
+| `embeddings` | Кэш AI-эмбеддингов |
+| `sessions` | Временные состояния |
 
 ---
 
-## 📄 License
+## 🐛 Устранение проблем
+
+### Ошибка: `pip not found`
+```bash
+sudo apt install python3-pip
+```
+
+### Ошибка: `ModuleNotFoundError`
+Убедись, что виртуальное окружение активировано:
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Ошибка подключения к Telegram API
+Если Telegram заблокирован, используй прокси в `.env`:
+```
+PROXY_URL=http://127.0.0.1:10809
+```
+
+### Бот не отвечает
+Проверь логи:
+```bash
+journalctl -u civis-bot -f
+```
+
+---
+
+## 📄 Лицензия
 
 MIT © Leonid Yasin
 
 ---
 
-## 📬 Support
+## 📬 Контакты
 
-For support, use the `/support` command in the bot or open an issue on GitHub.
-
----
-
-## 🔮 Future Roadmap
-
-- [ ] Real AI-powered matching with OpenAI
-- [ ] Payment integration (Stripe/PayPal)
-- [ ] Webhook for serverless deployment
-- [ ] Flutter mobile app
-- [ ] Corporate accounts and white-labeling
-- [ ] Private indexes for companies
+- **Telegram-бот:** [@civis_matcher_bot](https://t.me/civis_matcher_bot)
+- **GitHub:** [LeonidYasin/civis](https://github.com/LeonidYasin/civis)
+- **Поддержка:** `/support` в боте
