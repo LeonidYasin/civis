@@ -11,8 +11,8 @@
             box-sizing: border-box;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: #07090e;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0b0d10;
             color: #e4e6eb;
             line-height: 1.6;
         }
@@ -21,18 +21,16 @@
             margin: 0 auto;
             padding: 0 24px;
         }
-        
-        /* Header */
         header {
-            padding: 32px 0 20px;
-            border-bottom: 1px solid #1a1f2e;
+            padding: 40px 0 20px;
+            border-bottom: 1px solid #1e2330;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
         }
         .logo {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: 700;
             color: #fff;
             letter-spacing: -0.5px;
@@ -41,81 +39,53 @@
             color: #6c8cff;
         }
         .badge {
-            background: #1a1f2e;
-            padding: 6px 18px;
+            background: #1e2330;
+            padding: 6px 16px;
             border-radius: 20px;
-            font-size: 13px;
+            font-size: 14px;
             color: #8b95a9;
             border: 1px solid #2a3142;
         }
-        .badge strong {
-            color: #a78bfa;
-        }
-        
-        /* Hero */
         .hero {
-            padding: 80px 0 60px;
+            padding: 60px 0;
             text-align: center;
         }
-        .hero .version {
-            display: inline-block;
-            background: #1a1f2e;
-            color: #6c8cff;
-            padding: 4px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            border: 1px solid #2a3142;
-            margin-bottom: 20px;
-        }
         .hero h1 {
-            font-size: 52px;
+            font-size: 48px;
             font-weight: 800;
-            background: linear-gradient(135deg, #6c8cff, #a78bfa, #6c8cff);
-            background-size: 200% 200%;
+            background: linear-gradient(135deg, #6c8cff, #a78bfa);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 20px;
-            letter-spacing: -1.5px;
-            animation: gradientShift 4s ease-in-out infinite;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
         }
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-        }
-        .hero .slogan {
-            font-size: 22px;
-            font-weight: 400;
-            color: #c8ccd4;
-            max-width: 720px;
-            margin: 0 auto 16px;
-            line-height: 1.5;
-        }
-        .hero .slogan strong {
-            color: #a78bfa;
-            font-weight: 600;
-        }
-        .hero .sub-slogan {
-            font-size: 17px;
-            color: #5a647a;
-            max-width: 600px;
+        .hero p {
+            font-size: 20px;
+            color: #8b95a9;
+            max-width: 640px;
             margin: 0 auto 32px;
-            line-height: 1.6;
+        }
+        .hero .sub {
+            font-size: 16px;
+            color: #5a647a;
+            max-width: 560px;
+            margin: 0 auto;
         }
         .buttons {
             display: flex;
             gap: 16px;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 8px;
+            margin-top: 24px;
         }
         .btn {
-            padding: 14px 36px;
+            padding: 14px 32px;
             border-radius: 12px;
             font-weight: 600;
             text-decoration: none;
             font-size: 16px;
-            transition: all 0.25s ease;
+            transition: all 0.2s;
             display: inline-block;
         }
         .btn-primary {
@@ -125,16 +95,14 @@
         .btn-primary:hover {
             background: #5a7ae6;
             transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(108, 140, 255, 0.3);
         }
         .btn-secondary {
-            background: #1a1f2e;
+            background: #1e2330;
             color: #e4e6eb;
             border: 1px solid #2a3142;
         }
         .btn-secondary:hover {
             background: #2a3142;
-            transform: translateY(-2px);
         }
         .btn-outline {
             background: transparent;
@@ -145,33 +113,12 @@
             border-color: #6c8cff;
             color: #fff;
         }
-        .hero-stats {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-            margin-top: 40px;
-            flex-wrap: wrap;
-        }
-        .hero-stats .stat {
-            text-align: center;
-        }
-        .hero-stats .stat .number {
-            font-size: 28px;
-            font-weight: 700;
-            color: #fff;
-        }
-        .hero-stats .stat .label {
-            font-size: 14px;
-            color: #5a647a;
-        }
-        
-        /* Sections */
         .section {
             padding: 60px 0;
-            border-top: 1px solid #1a1f2e;
+            border-top: 1px solid #1e2330;
         }
         .section h2 {
-            font-size: 34px;
+            font-size: 32px;
             font-weight: 700;
             margin-bottom: 12px;
             color: #fff;
@@ -182,7 +129,7 @@
         .section .desc {
             color: #8b95a9;
             font-size: 18px;
-            max-width: 680px;
+            max-width: 640px;
         }
         .grid {
             display: grid;
@@ -191,15 +138,14 @@
             margin-top: 32px;
         }
         .card {
-            background: #0d1018;
+            background: #13171f;
             padding: 28px 24px;
             border-radius: 16px;
-            border: 1px solid #1a1f2e;
-            transition: border-color 0.25s, transform 0.2s;
+            border: 1px solid #1e2330;
+            transition: border-color 0.2s;
         }
         .card:hover {
             border-color: #2a3142;
-            transform: translateY(-3px);
         }
         .card .emoji {
             font-size: 32px;
@@ -219,34 +165,30 @@
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 14px;
+            gap: 16px;
             margin-top: 24px;
         }
         .feature-item {
-            background: #0d1018;
-            padding: 14px 18px;
+            background: #13171f;
+            padding: 16px 20px;
             border-radius: 12px;
-            border: 1px solid #1a1f2e;
+            border: 1px solid #1e2330;
             display: flex;
             align-items: center;
             gap: 12px;
             font-size: 15px;
             color: #c8ccd4;
-            transition: border-color 0.2s;
-        }
-        .feature-item:hover {
-            border-color: #2a3142;
         }
         .feature-item .icon {
-            font-size: 18px;
+            font-size: 20px;
         }
         .commands {
-            background: #0a0d14;
+            background: #0d0f15;
             padding: 24px;
             border-radius: 12px;
-            border: 1px solid #1a1f2e;
+            border: 1px solid #1e2330;
             margin-top: 20px;
-            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-family: monospace;
             font-size: 14px;
             color: #8b95a9;
             overflow-x: auto;
@@ -259,26 +201,19 @@
         }
         .cta {
             text-align: center;
-            padding: 50px 0 40px;
-            border-top: 1px solid #1a1f2e;
+            padding: 40px 0;
         }
         .cta h2 {
-            font-size: 34px;
+            font-size: 32px;
             margin-bottom: 8px;
-        }
-        .cta h2 span {
-            color: #6c8cff;
         }
         .cta p {
             color: #8b95a9;
-            margin-bottom: 28px;
-            font-size: 18px;
+            margin-bottom: 24px;
         }
-        
-        /* Footer */
         footer {
             padding: 32px 0;
-            border-top: 1px solid #1a1f2e;
+            border-top: 1px solid #1e2330;
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
@@ -293,39 +228,64 @@
         footer a:hover {
             text-decoration: underline;
         }
-        
-        @media (max-width: 768px) {
+        /* Comparison table */
+        .comparison {
+            margin-top: 32px;
+            overflow-x: auto;
+        }
+        .comparison table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+        }
+        .comparison th {
+            text-align: left;
+            padding: 12px 16px;
+            background: #13171f;
+            color: #8b95a9;
+            font-weight: 600;
+            border-bottom: 2px solid #1e2330;
+        }
+        .comparison td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #1e2330;
+            color: #c8ccd4;
+        }
+        .comparison .old {
+            color: #8b95a9;
+        }
+        .comparison .new {
+            color: #6c8cff;
+            font-weight: 500;
+        }
+        .comparison .check {
+            color: #34d399;
+            font-weight: 700;
+        }
+        .comparison tr:hover td {
+            background: #13171f;
+        }
+        .comparison .highlight {
+            border-left: 3px solid #6c8cff;
+        }
+        @media (max-width: 600px) {
             .hero h1 {
-                font-size: 34px;
+                font-size: 32px;
             }
-            .hero .slogan {
-                font-size: 18px;
-            }
-            .hero .sub-slogan {
-                font-size: 15px;
-            }
-            .section h2 {
-                font-size: 26px;
+            .hero p {
+                font-size: 17px;
             }
             header {
                 flex-direction: column;
                 gap: 12px;
                 align-items: flex-start;
             }
-            .hero-stats {
-                gap: 24px;
+            .comparison table {
+                font-size: 13px;
             }
-        }
-        @media (max-width: 480px) {
-            .hero h1 {
-                font-size: 28px;
-            }
-            .hero .slogan {
-                font-size: 16px;
-            }
-            .buttons .btn {
-                width: 100%;
-                text-align: center;
+            .comparison th,
+            .comparison td {
+                padding: 10px 12px;
             }
         }
     </style>
@@ -334,96 +294,114 @@
     <div class="container">
         <header>
             <div class="logo">Civis <span>·</span></div>
-            <div class="badge">v0.2.0 · <strong>Республика с AI-коммуникацией</strong></div>
+            <div class="badge">v0.2.0 · AI-республика</div>
         </header>
 
         <section class="hero">
-            <div class="version">⚡ v0.2.0 — Новая концепция</div>
-            <h1>Республика с AI-коммуникацией</h1>
-            <p class="slogan">
-                <strong>AI-агент</strong> соединяет людей без трения —<br>
-                превращая толпу в <strong>высокоорганизованное гражданское сообщество</strong>.
-            </p>
-            <p class="sub-slogan">
-                Никаких анкет. Никакого спама. Просто диалог с ИИ, который знает тебя,<br>
-                находит нужных людей и модерирует все взаимодействия.
+            <h1>Говори с AI — он сделает всё остальное</h1>
+            <p>
+                Один AI-интерфейс вместо 10 приложений. <br>
+                Такси, недвижимость, работа, товары, знакомства — без форм, без спама, без трения.
             </p>
             <div class="buttons">
                 <a href="https://t.me/civis_matcher_bot" class="btn btn-primary">🤖 Начать в Telegram</a>
                 <a href="https://github.com/LeonidYasin/civis" class="btn btn-secondary">📦 GitHub</a>
-                <a href="#institutions" class="btn btn-outline">🏛️ Институты</a>
             </div>
-            <div class="hero-stats">
-                <div class="stat">
-                    <div class="number">1+</div>
-                    <div class="label">Граждан</div>
-                </div>
-                <div class="stat">
-                    <div class="number">🧠</div>
-                    <div class="label">AI-матчинг</div>
-                </div>
-                <div class="stat">
-                    <div class="number">🏛️</div>
-                    <div class="label">Республика</div>
-                </div>
+            <p class="sub">
+                👥 1+ граждан · 🧠 AI-матчинг · 💬 Естественный язык · 🏛️ Республиканские институты
+            </p>
+        </section>
+
+        <!-- REPLACES 10 APPS SECTION -->
+        <section class="section">
+            <h2>Вместо <span>10 приложений</span></h2>
+            <p class="desc">
+                Civis заменяет такси, Авито, HH, Tinder, Циан и другие сервисы. Один AI-диалог — и всё.
+            </p>
+            <div class="comparison">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Что ты делаешь</th>
+                            <th>Сейчас (много приложений)</th>
+                            <th>В Civis (один AI)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>🚕 Такси</strong></td>
+                            <td class="old">Яндекс Go / Uber</td>
+                            <td class="new">«Мне в аэропорт завтра в 10» → AI находит водителя</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🏠 Недвижимость</strong></td>
+                            <td class="old">Авито / Циан</td>
+                            <td class="new">«Ищу 2-комнатную в центре до 200k» → AI показывает варианты</td>
+                        </tr>
+                        <tr>
+                            <td><strong>📦 Товары</strong></td>
+                            <td class="old">Ozon / Маркетплейсы</td>
+                            <td class="new">«Нужен ноутбук для программиста» → AI находит предложения</td>
+                        </tr>
+                        <tr>
+                            <td><strong>💼 Работа</strong></td>
+                            <td class="old">HH.ru / LinkedIn</td>
+                            <td class="new">«Ищу продакта в стартап» → AI матчит с кандидатами</td>
+                        </tr>
+                        <tr>
+                            <td><strong>❤️ Знакомства</strong></td>
+                            <td class="old">Tinder / Bumble</td>
+                            <td class="new">«Хочу найти единомышленников по AI» → AI соединяет по ценностям</td>
+                        </tr>
+                        <tr>
+                            <td><strong>💰 Инвесторы</strong></td>
+                            <td class="old">ANGEL / VC-чаты</td>
+                            <td class="new">«Ищу инвестора в AI-проект» → AI находит подходящих</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
+            <p style="color: #5a647a; margin-top: 16px; font-size: 14px;">
+                ✅ AI-модерация — никакого спама. Контакты только по взаимному согласию.
+            </p>
         </section>
 
         <section class="section">
-            <h2>Почему <span>Civis</span></h2>
+            <h2>Зачем <span>Civis</span></h2>
             <p class="desc">
-                Мы строим цифровую республику, где AI-агент — не просто матчер, а полноправный посредник,<br>
-                который проверяет, фильтрует и направляет все взаимодействия.
+                В мире, где связи решают всё, мы убрали трение между вопросом и ответом.
+                Ты просто говоришь с ИИ — он понимает, что тебе нужно, и находит тех, кто может помочь.
             </p>
             <div class="grid">
                 <div class="card">
                     <span class="emoji">🧠</span>
-                    <h3>AI-матчинг по смыслу</h3>
+                    <h3>AI-матчинг</h3>
                     <p>Не ключевые слова, а смысл. ИИ понимает твой профиль и находит совместимых людей — по ценностям, целям и навыкам.</p>
+                </div>
+                <div class="card">
+                    <span class="emoji">💬</span>
+                    <h3>Естественный диалог</h3>
+                    <p>Никаких анкет. Ты просто рассказываешь о себе в чате, а бот сам строит твой профиль и ищет связи.</p>
+                </div>
+                <div class="card">
+                    <span class="emoji">🛒</span>
+                    <h3>Маркетплейс</h3>
+                    <p>Публикуй предложения и запросы — от услуг до недвижимости. Всё в одном месте, с категориями и поиском.</p>
+                </div>
+                <div class="card">
+                    <span class="emoji">🔐</span>
+                    <h3>Конфиденциальность</h3>
+                    <p>Контакт раскрывается только по взаимному согласию. Твой профиль — твой актив.</p>
+                </div>
+                <div class="card">
+                    <span class="emoji">🏛️</span>
+                    <h3>Республика</h3>
+                    <p>Гражданство, суд, парламент — полноценные институты внутри бота. Сообщество управляет собой через голосования.</p>
                 </div>
                 <div class="card">
                     <span class="emoji">🤖</span>
                     <h3>AI-посредник</h3>
-                    <p>Все сообщения проходят через AI-агента. Он фильтрует спам, проверяет токсичность и помогает строить осмысленные связи.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">🏛️</span>
-                    <h3>Республиканские институты</h3>
-                    <p>Парламент, Суд, Правительство — полноценная республика внутри бота. Граждане голосуют, арбитраж решает споры.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">💬</span>
-                    <h3>Диалог вместо анкет</h3>
-                    <p>Ты просто говоришь с ИИ. Он сам собирает твой профиль, понимает цели и находит связи — без трения.</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="section" id="institutions">
-            <h2>Институты <span>Республики</span></h2>
-            <p class="desc">
-                Мы строим полноценное государство внутри Telegram — с разделением властей и AI-модерацией.
-            </p>
-            <div class="grid">
-                <div class="card">
-                    <span class="emoji">📜</span>
-                    <h3>Парламент</h3>
-                    <p>Граждане голосуют за законы: новые категории, правила, бюджет. Любой может предложить закон через <code>/propose_law</code>.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">⚖️</span>
-                    <h3>Суд</h3>
-                    <p>Споры решаются случайно выбранными гражданами-судьями. AI-агент собирает факты и помогает вынести справедливый вердикт.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">🏛️</span>
-                    <h3>Правительство</h3>
-                    <p>Избранные граждане управляют платформой, распределяют бюджет и следят за исполнением законов. Канцлер — глава Совета.</p>
-                </div>
-                <div class="card">
-                    <span class="emoji">👤</span>
-                    <h3>Гражданство</h3>
-                    <p>Статус гражданина даётся через поручительство, активность и вклад в сообщество. Граждане участвуют в управлении республикой.</p>
+                    <p>Все сообщения проходят через AI. Никакого спама, никаких мошенников. Только безопасные, осмысленные контакты.</p>
                 </div>
             </div>
         </section>
@@ -431,26 +409,28 @@
         <section class="section">
             <h2>Что умеет <span>бот</span></h2>
             <div class="features-grid">
-                <div class="feature-item"><span class="icon">📋</span> AI-анкета из диалога</div>
+                <div class="feature-item"><span class="icon">📋</span> Регистрация в диалоге</div>
                 <div class="feature-item"><span class="icon">📤</span> Предложения и запросы</div>
                 <div class="feature-item"><span class="icon">🏠</span> Недвижимость</div>
                 <div class="feature-item"><span class="icon">🚕</span> Такси и доставка</div>
                 <div class="feature-item"><span class="icon">🎯</span> AI-матчинг</div>
                 <div class="feature-item"><span class="icon">💳</span> Подписки</div>
                 <div class="feature-item"><span class="icon">📂</span> Загрузка диалогов с ИИ</div>
-                <div class="feature-item"><span class="icon">🏛️</span> Парламент / Суд</div>
-                <div class="feature-item"><span class="icon">🤖</span> AI-посредник</div>
                 <div class="feature-item"><span class="icon">🌐</span> EN / RU</div>
+                <div class="feature-item"><span class="icon">🏛️</span> Гражданство</div>
+                <div class="feature-item"><span class="icon">⚖️</span> Суд (арбитраж)</div>
+                <div class="feature-item"><span class="icon">🗳️</span> Парламент (голосования)</div>
             </div>
             <div class="commands">
                 <span class="cmd">/start</span> <span class="desc">— Создать профиль</span><br>
-                <span class="cmd">/menu</span> <span class="desc">— Полное меню</span><br>
                 <span class="cmd">/offer</span> <span class="desc">— Опубликовать предложение</span><br>
                 <span class="cmd">/request</span> <span class="desc">— Опубликовать запрос</span><br>
                 <span class="cmd">/match</span> <span class="desc">— AI-матчинг</span><br>
+                <span class="cmd">/marketplace</span> <span class="desc">— Просмотр маркетплейса</span><br>
+                <span class="cmd">/subscribe</span> <span class="desc">— Тарифы</span><br>
+                <span class="cmd">/upload_dialog</span> <span class="desc">— Загрузить историю диалогов</span><br>
                 <span class="cmd">/citizenship</span> <span class="desc">— Статус гражданина</span><br>
-                <span class="cmd">/arbitrate</span> <span class="desc">— Арбитраж (Суд)</span><br>
-                <span class="cmd">/propose_law</span> <span class="desc">— Предложить закон</span>
+                <span class="cmd">/arbitrate</span> <span class="desc">— Запустить арбитраж</span>
             </div>
         </section>
 
@@ -464,8 +444,8 @@
                 </div>
                 <div class="card">
                     <span class="emoji">👥</span>
-                    <h3>Граждане</h3>
-                    <p>Создай профиль, находи людей, публикуй предложения, участвуй в управлении республикой.</p>
+                    <h3>Пользователи</h3>
+                    <p>Создай профиль, находи людей, публикуй предложения. Бот уже работает и ждёт тебя.</p>
                 </div>
                 <div class="card">
                     <span class="emoji">💰</span>
@@ -476,8 +456,8 @@
         </section>
 
         <section class="cta">
-            <h2>Стань <span>гражданином</span></h2>
-            <p>Открой Telegram и начни диалог с Civis-агентом.<br>Войди в сообщество, где AI соединяет людей без трения.</p>
+            <h2>Начни прямо <span>сейчас</span></h2>
+            <p>Открой Telegram и начни диалог с Civis-агентом.</p>
             <div class="buttons">
                 <a href="https://t.me/civis_matcher_bot" class="btn btn-primary">🤖 Открыть бота</a>
                 <a href="https://github.com/LeonidYasin/civis/issues" class="btn btn-outline">🐛 Сообщить о проблеме</a>
@@ -489,8 +469,7 @@
             <span>
                 <a href="https://github.com/LeonidYasin/civis">GitHub</a> ·
                 <a href="https://t.me/civis_channel">Telegram-канал</a> ·
-                <a href="https://github.com/LeonidYasin/civis/issues">Issues</a> ·
-                <a href="index.v1.html">v1.0 (архив)</a>
+                <a href="https://github.com/LeonidYasin/civis/issues">Issues</a>
             </span>
         </footer>
     </div>
