@@ -1,29 +1,33 @@
 """
-Coach Bot Database Layer
+Database operations for Coach Bot
 """
 
 import sqlite3
-import json
 from datetime import datetime, date, timedelta
 from typing import Optional, Dict, List, Any
-from pathlib import Path
+import json
+
+from .config import config
 
 
 class CoachDB:
-    """Database operations for coach bot"""
+    """Database handler for Coach Bot"""
     
-    def __init__(self, db_path: str = "civis.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or config.database_url.replace('sqlite:///', '')
         self._init_tables()
     
-    def _get_conn(self):
+    def _get_connection(self):
         """Get database connection"""
         return sqlite3.connect(self.db_path)
     
     def _init_tables(self):
-        """Create coach bot tables if they don't exist"""
-        with self._get_conn() as conn:
-            conn.execute("""
+        """Initialize database tables"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Users table
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS coach_users (
                     user_id INTEGER PRIMARY KEY,
                     status TEXT DEFAULT 'free',
@@ -32,13 +36,14 @@ class CoachDB:
                     subscription_end DATE,
                     stage TEXT DEFAULT 'welcome',
                     model_preference TEXT DEFAULT 'deepseek',
-                    api_key_encrypted TEXT,
+                    api_key TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            conn.execute("""
+            # Goals table
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS coach_goals (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -51,7 +56,8 @@ class CoachDB:
                 )
             """)
             
-            conn.execute("""
+            # Check-ins table
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS coach_checkins (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -64,7 +70,8 @@ class CoachDB:
                 )
             """)
             
-            conn.execute("""
+            # Messages table
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS coach_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
@@ -75,234 +82,171 @@ class CoachDB:
                 )
             """)
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS coach_subscriptions (
+            # Payments table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS coach_payments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    payment_id TEXT,
                     amount INTEGER,
                     currency TEXT DEFAULT 'RUB',
+                    plan TEXT,
+                    payment_id TEXT,
                     status TEXT DEFAULT 'pending',
-                    plan_type TEXT DEFAULT 'monthly',
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    confirmed_at DATETIME,
                     FOREIGN KEY (user_id) REFERENCES coach_users(user_id)
                 )
             """)
             
             conn.commit()
     
-    # ============ User operations ============
+    # --- User operations ---
     
     def get_or_create_user(self, user_id: int) -> Dict[str, Any]:
         """Get user or create if not exists"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
                 "SELECT * FROM coach_users WHERE user_id = ?",
                 (user_id,)
             )
-            row = cur.fetchone()
+            row = cursor.fetchone()
             
             if row:
-                return self._row_to_dict(row, cur.description)
+                return self._row_to_dict(row, cursor)
+            else:
+                cursor.execute(
+                    "INSERT INTO coach_users (user_id) VALUES (?)",
+                    (user_id,)
+                )
+                conn.commit()
+                cursor.execute(
+                    "SELECT * FROM coach_users WHERE user_id = ?",
+                    (user_id,)
+                )
+                return self._row_to_dict(cursor.fetchone(), cursor)
+    
+    def update_user(self, user_id: int, **kwargs):
+        """Update user fields"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            fields = []
+            values = []
+            for key, value in kwargs.items():
+                if key in ['status', 'stage', 'model_preference', 'api_key']:
+                    fields.append(f"{key} = ?")
+                    values.append(value)
+                elif key in ['trial_start', 'trial_end', 'subscription_end']:
+                    fields.append(f"{key} = ?")
+                    values.append(value)
             
-            # Create new user
-            conn.execute(
-                "INSERT INTO coach_users (user_id, status, stage) VALUES (?, ?, ?)",
-                (user_id, 'free', 'welcome')
-            )
-            conn.commit()
-            
-            return {
-                'user_id': user_id,
-                'status': 'free',
-                'stage': 'welcome',
-                'model_preference': 'deepseek',
-                'trial_start': None,
-                'trial_end': None,
-                'subscription_end': None,
-            }
-    
-    def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user by ID"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                "SELECT * FROM coach_users WHERE user_id = ?",
-                (user_id,)
-            )
-            row = cur.fetchone()
-            if row:
-                return self._row_to_dict(row, cur.description)
-            return None
-    
-    def update_user_stage(self, user_id: int, stage: str):
-        """Update user stage"""
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE coach_users SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                (stage, user_id)
-            )
-            conn.commit()
-    
-    def update_user_status(self, user_id: int, status: str):
-        """Update user status (free/trial/paid)"""
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE coach_users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
-                (status, user_id)
-            )
-            conn.commit()
-    
-    def start_trial(self, user_id: int) -> Dict[str, Any]:
-        """Start trial period for user"""
-        today = date.today()
-        trial_end = today + timedelta(days=3)
-        
-        with self._get_conn() as conn:
-            conn.execute(
-                """UPDATE coach_users 
-                   SET status = 'trial', 
-                       trial_start = ?, 
-                       trial_end = ?,
-                       updated_at = CURRENT_TIMESTAMP 
-                   WHERE user_id = ?""",
-                (today.isoformat(), trial_end.isoformat(), user_id)
-            )
-            conn.commit()
-        
-        return {'trial_start': today.isoformat(), 'trial_end': trial_end.isoformat()}
-    
-    def activate_subscription(self, user_id: int, months: int = 1):
-        """Activate paid subscription"""
-        today = date.today()
-        end_date = today + timedelta(days=30 * months)
-        
-        with self._get_conn() as conn:
-            conn.execute(
-                """UPDATE coach_users 
-                   SET status = 'paid', 
-                       subscription_end = ?,
-                       updated_at = CURRENT_TIMESTAMP 
-                   WHERE user_id = ?""",
-                (end_date.isoformat(), user_id)
-            )
-            conn.commit()
+            if fields:
+                fields.append("updated_at = CURRENT_TIMESTAMP")
+                values.append(user_id)
+                query = f"UPDATE coach_users SET {', '.join(fields)} WHERE user_id = ?"
+                cursor.execute(query, values)
+                conn.commit()
     
     def get_user_status(self, user_id: int) -> Dict[str, Any]:
-        """Get user's current status and limits"""
-        user = self.get_user(user_id)
-        if not user:
-            return {'status': 'free', 'can_message': True, 'messages_left': 5}
+        """Get user status and limits"""
+        user = self.get_or_create_user(user_id)
+        today = date.today()
         
-        status = user.get('status', 'free')
+        # Check subscription status
+        is_trial_active = False
+        is_subscribed = False
         
-        # Check trial expiration
-        if status == 'trial':
-            trial_end = user.get('trial_end')
-            if trial_end and date.today() > date.fromisoformat(trial_end):
-                self.update_user_status(user_id, 'free')
-                status = 'free'
+        if user.get('trial_end'):
+            trial_end = datetime.strptime(user['trial_end'], '%Y-%m-%d').date()
+            is_trial_active = today <= trial_end
         
-        # Check subscription expiration
-        if status == 'paid':
-            sub_end = user.get('subscription_end')
-            if sub_end and date.today() > date.fromisoformat(sub_end):
-                self.update_user_status(user_id, 'free')
-                status = 'free'
+        if user.get('subscription_end'):
+            sub_end = datetime.strptime(user['subscription_end'], '%Y-%m-%d').date()
+            is_subscribed = today <= sub_end
         
-        # Count today's messages for free tier
-        today = date.today().isoformat()
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                """SELECT COUNT(*) FROM coach_messages 
-                   WHERE user_id = ? AND role = 'user' AND DATE(created_at) = ?""",
-                (user_id, today)
+        # Count today's messages
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM coach_messages WHERE user_id = ? AND DATE(created_at) = DATE('now')",
+                (user_id,)
             )
-            count = cur.fetchone()[0]
-        
-        free_limit = 5
-        messages_left = max(0, free_limit - count) if status == 'free' else 999
+            today_messages = cursor.fetchone()[0]
         
         return {
-            'status': status,
-            'can_message': status != 'free' or messages_left > 0,
-            'messages_left': messages_left,
+            'status': user.get('status', 'free'),
             'stage': user.get('stage', 'welcome'),
+            'is_trial_active': is_trial_active,
+            'is_subscribed': is_subscribed,
+            'today_messages': today_messages,
+            'free_limit': config.free_messages_per_day,
+            'model_preference': user.get('model_preference', 'deepseek'),
+            'has_api_key': bool(user.get('api_key')),
         }
     
-    # ============ Message operations ============
+    # --- Messages ---
     
     def save_message(self, user_id: int, role: str, content: str):
         """Save a message"""
-        with self._get_conn() as conn:
-            conn.execute(
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
                 "INSERT INTO coach_messages (user_id, role, content) VALUES (?, ?, ?)",
                 (user_id, role, content)
             )
             conn.commit()
     
-    def get_recent_messages(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_recent_messages(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent messages for context"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                """SELECT role, content, created_at FROM coach_messages 
-                   WHERE user_id = ? ORDER BY created_at DESC LIMIT ?""",
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT role, content FROM coach_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
                 (user_id, limit)
             )
-            rows = cur.fetchall()
-            return [
-                {'role': row[0], 'content': row[1], 'created_at': row[2]}
-                for row in reversed(rows)
-            ]
+            rows = cursor.fetchall()
+            return [{'role': row[0], 'content': row[1]} for row in reversed(rows)]
     
-    # ============ Goal operations ============
+    # --- Goals ---
     
     def add_goal(self, user_id: int, goal_text: str, priority: int = 1) -> int:
         """Add a goal"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
                 "INSERT INTO coach_goals (user_id, goal_text, priority) VALUES (?, ?, ?)",
                 (user_id, goal_text, priority)
             )
             conn.commit()
-            return cur.lastrowid
+            return cursor.lastrowid
     
     def get_active_goals(self, user_id: int) -> List[Dict[str, Any]]:
-        """Get all active goals"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                "SELECT * FROM coach_goals WHERE user_id = ? AND status = 'active' ORDER BY priority DESC",
+        """Get active goals"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, goal_text, priority, status FROM coach_goals WHERE user_id = ? AND status = 'active' ORDER BY priority DESC",
                 (user_id,)
             )
-            rows = cur.fetchall()
-            return [
-                {
-                    'id': row[0],
-                    'user_id': row[1],
-                    'goal_text': row[2],
-                    'priority': row[3],
-                    'status': row[4],
-                    'created_at': row[5],
-                    'completed_at': row[6],
-                }
-                for row in rows
-            ]
+            rows = cursor.fetchall()
+            return [{'id': r[0], 'text': r[1], 'priority': r[2], 'status': r[3]} for r in rows]
     
     def complete_goal(self, goal_id: int):
         """Mark goal as completed"""
-        with self._get_conn() as conn:
-            conn.execute(
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
                 "UPDATE coach_goals SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (goal_id,)
             )
             conn.commit()
     
-    # ============ Check-in operations ============
+    # --- Check-ins ---
     
-    def save_checkin(self, user_id: int, mood: int, progress: str, blocked_by: str = ""):
+    def save_checkin(self, user_id: int, mood: int = None, progress: str = None, blocked_by: str = None):
         """Save a daily check-in"""
-        with self._get_conn() as conn:
-            conn.execute(
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
                 """INSERT INTO coach_checkins (user_id, date, mood, progress, blocked_by) 
                    VALUES (?, DATE('now'), ?, ?, ?)""",
                 (user_id, mood, progress, blocked_by)
@@ -311,51 +255,59 @@ class CoachDB:
     
     def get_today_checkin(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get today's check-in if exists"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                "SELECT * FROM coach_checkins WHERE user_id = ? AND date = DATE('now')",
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT mood, progress, blocked_by FROM coach_checkins WHERE user_id = ? AND date = DATE('now')",
                 (user_id,)
             )
-            row = cur.fetchone()
+            row = cursor.fetchone()
             if row:
-                return {
-                    'id': row[0],
-                    'user_id': row[1],
-                    'date': row[2],
-                    'mood': row[3],
-                    'progress': row[4],
-                    'blocked_by': row[5],
-                    'created_at': row[6],
-                }
+                return {'mood': row[0], 'progress': row[1], 'blocked_by': row[2]}
             return None
     
-    # ============ Subscription operations ============
+    # --- Payments ---
     
-    def create_subscription(
-        self, user_id: int, payment_id: str, amount: int, plan_type: str = 'monthly'
-    ) -> int:
-        """Create a subscription record"""
-        with self._get_conn() as conn:
-            cur = conn.execute(
-                """INSERT INTO coach_subscriptions (user_id, payment_id, amount, plan_type, status)
-                   VALUES (?, ?, ?, ?, 'pending')""",
-                (user_id, payment_id, amount, plan_type)
+    def create_payment(self, user_id: int, amount: int, plan: str, payment_id: str) -> int:
+        """Create a payment record"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO coach_payments (user_id, amount, plan, payment_id) VALUES (?, ?, ?, ?)",
+                (user_id, amount, plan, payment_id)
             )
             conn.commit()
-            return cur.lastrowid
+            return cursor.lastrowid
     
-    def confirm_subscription(self, payment_id: str):
-        """Confirm a subscription payment"""
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE coach_subscriptions SET status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE payment_id = ?",
+    def confirm_payment(self, payment_id: str):
+        """Confirm a payment and activate subscription"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE coach_payments SET status = 'completed' WHERE payment_id = ?",
                 (payment_id,)
             )
+            
+            # Get user_id from payment
+            cursor.execute(
+                "SELECT user_id, plan FROM coach_payments WHERE payment_id = ?",
+                (payment_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                user_id, plan = row
+                end_date = date.today() + timedelta(days=30)
+                cursor.execute(
+                    "UPDATE coach_users SET status = 'paid', subscription_end = ? WHERE user_id = ?",
+                    (end_date.isoformat(), user_id)
+                )
             conn.commit()
     
-    # ============ Helper methods ============
+    # --- Helper ---
     
-    @staticmethod
-    def _row_to_dict(row, description):
+    def _row_to_dict(self, row, cursor) -> Dict[str, Any]:
         """Convert SQLite row to dict"""
-        return {col[0]: row[i] for i, col in enumerate(description)}
+        if not row:
+            return {}
+        columns = [description[0] for description in cursor.description]
+        return {columns[i]: row[i] for i in range(len(columns))}
