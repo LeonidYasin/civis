@@ -1,271 +1,226 @@
 """
-Coach Bot Payments
-Integration with YooKassa and Stripe
+Payment processing for Coach Bot
+Supports YooKassa (Russian) and Stripe (international)
 """
 
-import logging
-import uuid
-from typing import Optional, Dict, Any
-from datetime import datetime
-import requests
 import json
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+import logging
 
-from .db import CoachDB
 from .config import config
+from .db import CoachDB
 
 logger = logging.getLogger(__name__)
 
 
 class PaymentProcessor:
-    """Handle payments for coach bot subscriptions"""
+    """Handle subscriptions and payments"""
     
     def __init__(self):
         self.db = CoachDB()
-        self.yookassa_shop_id = config.yookassa_shop_id
-        self.yookassa_secret = config.yookassa_secret_key
-        self.stripe_secret = config.stripe_secret_key
     
-    def create_yookassa_payment(
-        self,
-        user_id: int,
-        amount: int = 999,
-        description: str = "Подписка на Coach Bot",
-        return_url: str = None,
-    ) -> Dict[str, Any]:
-        """
-        Create a YooKassa payment
+    def create_yookassa_payment(self, user_id: int, plan: str, amount: int) -> Dict[str, Any]:
+        """Create a YooKassa payment"""
+        if not config.yookassa_shop_id or not config.yookassa_secret_key:
+            return {'error': 'YooKassa not configured'}
         
-        Returns:
-            Dict with payment_id, confirmation_url, and status
-        """
-        if not self.yookassa_shop_id or not self.yookassa_secret:
-            logger.warning("YooKassa credentials not configured")
-            return {
-                "status": "error",
-                "message": "Payment system not configured",
-            }
+        import requests
         
         payment_id = f"coach_{user_id}_{uuid.uuid4().hex[:8]}"
         
-        # Create payment in YooKassa
         url = "https://api.yookassa.ru/v3/payments"
-        headers = {
-            "Content-Type": "application/json",
-            "Idempotence-Key": payment_id,
-        }
+        auth = (config.yookassa_shop_id, config.yookassa_secret_key)
         
-        # Basic auth with shop_id and secret
-        auth = (self.yookassa_shop_id, self.yookassa_secret)
-        
-        payload = {
+        data = {
             "amount": {
                 "value": str(amount),
-                "currency": "RUB",
+                "currency": "RUB"
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": return_url or "https://t.me/civis_matcher_bot",
+                "return_url": "https://t.me/civis_matcher_bot"  # Will be configurable
             },
             "capture": True,
-            "description": description,
+            "description": f"Coach Bot {plan} subscription",
             "metadata": {
                 "user_id": str(user_id),
-                "payment_id": payment_id,
+                "plan": plan,
+                "payment_id": payment_id
             }
         }
         
         try:
-            response = requests.post(url, headers=headers, auth=auth, json=payload, timeout=30)
+            response = requests.post(url, json=data, auth=auth)
             response.raise_for_status()
-            data = response.json()
+            result = response.json()
             
-            # Save subscription record
-            self.db.create_subscription(
-                user_id=user_id,
-                payment_id=payment_id,
-                amount=amount,
-                plan_type="monthly",
-            )
+            # Save payment record
+            self.db.create_payment(user_id, amount, plan, payment_id)
             
             return {
-                "status": "pending",
-                "payment_id": payment_id,
-                "confirmation_url": data.get("confirmation", {}).get("confirmation_url"),
-                "yookassa_id": data.get("id"),
+                'payment_id': payment_id,
+                'confirmation_url': result['confirmation']['confirmation_url'],
+                'status': result['status'],
             }
         except Exception as e:
-            logger.error(f"YooKassa payment creation error: {e}")
-            return {
-                "status": "error",
-                "message": str(e),
-            }
+            logger.error(f"YooKassa payment error: {e}")
+            return {'error': str(e)}
     
-    def confirm_yookassa_payment(self, payment_id: str) -> Dict[str, Any]:
-        """
-        Confirm a YooKassa payment after webhook notification
-        """
-        if not self.yookassa_shop_id or not self.yookassa_secret:
-            return {"status": "error", "message": "Payment system not configured"}
+    def create_stripe_payment(self, user_id: int, plan: str, amount: int, currency: str = 'usd') -> Dict[str, Any]:
+        """Create a Stripe payment"""
+        if not config.stripe_api_key:
+            return {'error': 'Stripe not configured'}
         
-        url = f"https://api.yookassa.ru/v3/payments/{payment_id}"
-        auth = (self.yookassa_shop_id, self.yookassa_secret)
+        import stripe
+        stripe.api_key = config.stripe_api_key
+        
+        # Convert RUB to USD (approximate)
+        if currency == 'rub':
+            amount_usd = int(amount / 75)  # Approximate conversion
+        else:
+            amount_usd = amount
         
         try:
-            response = requests.get(url, auth=auth, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get("status") == "succeeded":
-                # Activate subscription
-                user_id = data.get("metadata", {}).get("user_id")
-                if user_id:
-                    self.db.activate_subscription(int(user_id), months=1)
-                    self.db.confirm_subscription(payment_id)
-                    
-                    return {
-                        "status": "success",
-                        "user_id": user_id,
-                        "payment_id": payment_id,
-                    }
-            
-            return {
-                "status": data.get("status", "unknown"),
-                "payment_id": payment_id,
-            }
-        except Exception as e:
-            logger.error(f"YooKassa payment confirmation error: {e}")
-            return {"status": "error", "message": str(e)}
-    
-    def create_stripe_payment(
-        self,
-        user_id: int,
-        amount: int = 15,
-        currency: str = "usd",
-    ) -> Dict[str, Any]:
-        """
-        Create a Stripe payment session
-        
-        Returns:
-            Dict with checkout_url and payment_id
-        """
-        if not self.stripe_secret:
-            logger.warning("Stripe credentials not configured")
-            return {
-                "status": "error",
-                "message": "Payment system not configured",
-            }
-        
-        try:
-            import stripe
-            stripe.api_key = self.stripe_secret
-            
             # Create checkout session
             session = stripe.checkout.Session.create(
-                payment_method_types=["card"],
+                payment_method_types=['card'],
                 line_items=[{
-                    "price_data": {
-                        "currency": currency,
-                        "product_data": {
-                            "name": "Coach Bot Subscription",
-                            "description": "Monthly access to AI coaching",
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f'Coach Bot {plan} Subscription',
+                            'description': 'Personal AI coach for goal setting and achievement',
                         },
-                        "unit_amount": amount * 100,  # Stripe uses cents
+                        'unit_amount': amount_usd * 100,  # Stripe uses cents
+                        'recurring': {
+                            'interval': 'month',
+                        }
                     },
-                    "quantity": 1,
+                    'quantity': 1,
                 }],
-                mode="payment",
-                success_url="https://t.me/civis_matcher_bot?start=success",
-                cancel_url="https://t.me/civis_matcher_bot?start=cancel",
+                mode='subscription',
+                success_url='https://t.me/civis_matcher_bot?start=success',
+                cancel_url='https://t.me/civis_matcher_bot?start=cancel',
                 metadata={
-                    "user_id": str(user_id),
-                },
+                    'user_id': str(user_id),
+                    'plan': plan,
+                }
             )
             
-            payment_id = session.id
-            
-            # Save subscription record
-            self.db.create_subscription(
-                user_id=user_id,
-                payment_id=payment_id,
-                amount=amount,
-                plan_type="monthly",
-            )
+            # Save payment record
+            self.db.create_payment(user_id, amount, plan, session.id)
             
             return {
-                "status": "pending",
-                "payment_id": payment_id,
-                "checkout_url": session.url,
+                'payment_id': session.id,
+                'confirmation_url': session.url,
+                'status': 'pending',
             }
         except Exception as e:
-            logger.error(f"Stripe payment creation error: {e}")
-            return {
-                "status": "error",
-                "message": str(e),
-            }
+            logger.error(f"Stripe payment error: {e}")
+            return {'error': str(e)}
     
-    def handle_yookassa_webhook(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Handle YooKassa webhook notification
-        
-        Expected payload format from YooKassa:
-        {
-            "event": "payment.succeeded",
-            "object": {
-                "id": "payment_id",
-                "status": "succeeded",
-                "metadata": {"user_id": "123"}
-            }
-        }
-        """
+    def confirm_payment(self, payment_id: str, provider: str = 'yookassa') -> bool:
+        """Confirm payment and activate subscription"""
         try:
-            event = payload.get("event")
-            payment_data = payload.get("object", {})
-            
-            if event == "payment.succeeded":
-                payment_id = payment_data.get("id")
-                if payment_id:
-                    return self.confirm_yookassa_payment(payment_id)
-            
-            return {
-                "status": "ignored",
-                "event": event,
-            }
+            self.db.confirm_payment(payment_id)
+            return True
         except Exception as e:
-            logger.error(f"Webhook handling error: {e}")
-            return {"status": "error", "message": str(e)}
+            logger.error(f"Payment confirmation error: {e}")
+            return False
     
     def get_subscription_status(self, user_id: int) -> Dict[str, Any]:
         """Get user's subscription status"""
-        user = self.db.get_user(user_id)
-        if not user:
-            return {"status": "not_found"}
+        user = self.db.get_or_create_user(user_id)
+        status = self.db.get_user_status(user_id)
         
-        status = user.get("status", "free")
-        result = {
-            "status": status,
-            "plan": "free",
+        return {
+            'status': status['status'],
+            'is_subscribed': status['is_subscribed'],
+            'is_trial_active': status['is_trial_active'],
+            'trial_days_left': self._get_trial_days_left(user),
+            'subscription_days_left': self._get_subscription_days_left(user),
+            'today_messages': status['today_messages'],
+            'free_limit': status['free_limit'],
         }
-        
-        if status == "trial":
-            result["plan"] = "trial"
-            result["ends_at"] = user.get("trial_end")
-            result["days_left"] = self._days_until(user.get("trial_end")) if user.get("trial_end") else 0
-        elif status == "paid":
-            result["plan"] = "monthly"
-            result["ends_at"] = user.get("subscription_end")
-            result["days_left"] = self._days_until(user.get("subscription_end")) if user.get("subscription_end") else 0
-        
-        return result
     
-    @staticmethod
-    def _days_until(date_str: Optional[str]) -> int:
-        """Calculate days until a date"""
-        if not date_str:
-            return 0
-        from datetime import date
+    def _get_trial_days_left(self, user: Dict) -> Optional[int]:
+        """Get days left in trial"""
+        if not user.get('trial_end'):
+            return None
         try:
-            target = date.fromisoformat(date_str)
-            delta = target - date.today()
+            end_date = datetime.strptime(user['trial_end'], '%Y-%m-%d').date()
+            delta = end_date - datetime.now().date()
             return max(0, delta.days)
-        except (ValueError, TypeError):
-            return 0
+        except:
+            return None
+    
+    def _get_subscription_days_left(self, user: Dict) -> Optional[int]:
+        """Get days left in subscription"""
+        if not user.get('subscription_end'):
+            return None
+        try:
+            end_date = datetime.strptime(user['subscription_end'], '%Y-%m-%d').date()
+            delta = end_date - datetime.now().date()
+            return max(0, delta.days)
+        except:
+            return None
+
+
+# Webhook handlers
+
+def handle_yookassa_webhook(request_data: Dict) -> Dict[str, Any]:
+    """Handle YooKassa webhook"""
+    event = request_data.get('event')
+    
+    if event == 'payment.succeeded':
+        payment_data = request_data.get('object', {})
+        metadata = payment_data.get('metadata', {})
+        payment_id = metadata.get('payment_id')
+        
+        if payment_id:
+            processor = PaymentProcessor()
+            success = processor.confirm_payment(payment_id, 'yookassa')
+            return {'status': 'ok', 'confirmed': success}
+    
+    return {'status': 'ok'}
+
+
+def handle_stripe_webhook(payload: bytes, sig_header: str) -> Dict[str, Any]:
+    """Handle Stripe webhook"""
+    if not config.stripe_api_key:
+        return {'error': 'Stripe not configured'}
+    
+    import stripe
+    stripe.api_key = config.stripe_api_key
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, 'whsec_placeholder'  # Should be configurable
+        )
+    except Exception as e:
+        logger.error(f"Stripe webhook error: {e}")
+        return {'error': str(e)}
+    
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        user_id = session.get('metadata', {}).get('user_id')
+        
+        if user_id:
+            processor = PaymentProcessor()
+            processor.db.confirm_payment(session['id'])
+            
+            # Activate subscription
+            from .db import CoachDB
+            db = CoachDB()
+            end_date = datetime.now().date() + timedelta(days=30)
+            db.update_user(
+                int(user_id),
+                status='paid',
+                subscription_end=end_date.isoformat()
+            )
+            
+            return {'status': 'ok'}
+    
+    return {'status': 'ok'}
