@@ -1,182 +1,259 @@
-"""Stage management for coach_bot — handles flow between welcome, reflection, planning, tracking."""
+"""
+Coach Bot Stage Logic
+Handles different stages: welcome → reflection → planning → tracking
+"""
 
-from .prompts import WELCOME_PROMPT, REFLECTION_PROMPT, PLANNING_PROMPT, TRACKING_PROMPT, TRIAL_END_PROMPT
-from .model_router import ModelRouter
+import logging
+from typing import Dict, Any, List
 from .db import CoachDB
+from .prompts import get_prompt_for_stage
+from .model_router import ModelRouter, ModelResponse
+
+logger = logging.getLogger(__name__)
+
 
 class StageRouter:
+    """Route messages based on user stage"""
+    
     def __init__(self):
         self.db = CoachDB()
-        self.model = ModelRouter()
-
-    def route(self, user_id: int, text: str, stage: str, status: str) -> str:
-        """Route message based on current stage."""
+        self.model_router = ModelRouter()
+    
+    async def route(
+        self,
+        user_id: int,
+        message: str,
+        stage: str,
+        status: str,
+        model_preference: str = "deepseek",
+        user_api_key: str = None,
+    ) -> str:
+        """
+        Route a message to the appropriate stage handler
         
-        # If free user and not in welcome stage, show paywall
-        if status == 'free' and stage != 'welcome' and stage != 'paywall':
-            return self._show_paywall()
-
-        if stage == 'welcome':
-            return self._handle_welcome(user_id, text)
-        elif stage == 'reflection':
-            return self._handle_reflection(user_id, text)
-        elif stage == 'planning':
-            return self._handle_planning(user_id, text)
-        elif stage == 'tracking':
-            return self._handle_tracking(user_id, text)
-        elif stage == 'paywall':
-            return self._handle_paywall(user_id, text)
+        Returns:
+            Response text to send to user
+        """
+        logger.info(f"Routing message for user {user_id}, stage: {stage}, status: {status}")
+        
+        # Check if user has reached message limit on free tier
+        if status == "free" and stage != "welcome":
+            status_info = self.db.get_user_status(user_id)
+            if not status_info.get("can_message", True):
+                return self._get_paywall_message()
+        
+        # Handle stage-specific logic
+        if stage == "welcome":
+            return await self._handle_welcome(user_id, message)
+        elif stage == "reflection":
+            return await self._handle_reflection(user_id, message, model_preference, user_api_key)
+        elif stage == "planning":
+            return await self._handle_planning(user_id, message, model_preference, user_api_key)
+        elif stage == "tracking":
+            return await self._handle_tracking(user_id, message, model_preference, user_api_key)
+        elif stage == "payment":
+            return self._get_paywall_message()
         else:
-            return self._handle_welcome(user_id, text)
+            return self._get_fallback_response()
+    
+    async def _handle_welcome(self, user_id: int, message: str) -> str:
+        """Handle welcome stage - first contact"""
+        # Save user message
+        self.db.save_message(user_id, "user", message)
+        
+        # Get recent context
+        history = self.db.get_recent_messages(user_id, 10)
+        
+        # Build messages for model
+        messages = [
+            {"role": "system", "content": get_prompt_for_stage("welcome")},
+        ]
+        
+        # Add history
+        for h in history:
+            messages.append({"role": h["role"], "content": h["content"]})
+        
+        # Add current message if not already in history
+        if not history or history[-1]["content"] != message:
+            messages.append({"role": "user", "content": message})
+        
+        # Get response
+        response = self.model_router.call(messages, model="deepseek")
+        
+        # Save response
+        self.db.save_message(user_id, "assistant", response.content)
+        
+        # Check if should move to reflection stage
+        # After a few exchanges, move to reflection
+        message_count = len([m for m in history if m["role"] == "user"]) + 1
+        if message_count >= 3:
+            self.db.update_user_stage(user_id, "reflection")
+        
+        return response.content
+    
+    async def _handle_reflection(
+        self,
+        user_id: int,
+        message: str,
+        model: str,
+        user_api_key: str = None,
+    ) -> str:
+        """Handle reflection stage - deep self-understanding"""
+        # Save user message
+        self.db.save_message(user_id, "user", message)
+        
+        # Get recent context
+        history = self.db.get_recent_messages(user_id, 30)
+        
+        # Build messages for model
+        messages = [
+            {"role": "system", "content": get_prompt_for_stage("reflection")},
+        ]
+        
+        for h in history:
+            messages.append({"role": h["role"], "content": h["content"]})
+        
+        if not history or history[-1]["content"] != message:
+            messages.append({"role": "user", "content": message})
+        
+        # Get response
+        response = self.model_router.call(
+            messages,
+            model=model,
+            user_api_key=user_api_key,
+            temperature=0.8,
+        )
+        
+        # Save response
+        self.db.save_message(user_id, "assistant", response.content)
+        
+        # Check if should move to planning stage
+        # Look for signs of clarity: user mentions "I realize", "I want", "my goal"
+        clarity_indicators = ["я понял", "я хочу", "моя цель", "я решил", "теперь я вижу"]
+        has_clarity = any(indicator in message.lower() for indicator in clarity_indicators)
+        
+        message_count = len([m for m in history if m["role"] == "user"]) + 1
+        if has_clarity and message_count >= 5:
+            self.db.update_user_stage(user_id, "planning")
+        
+        return response.content
+    
+    async def _handle_planning(
+        self,
+        user_id: int,
+        message: str,
+        model: str,
+        user_api_key: str = None,
+    ) -> str:
+        """Handle planning stage - goal setting and action plan"""
+        # Save user message
+        self.db.save_message(user_id, "user", message)
+        
+        # Get recent context
+        history = self.db.get_recent_messages(user_id, 30)
+        
+        # Build messages
+        messages = [
+            {"role": "system", "content": get_prompt_for_stage("planning")},
+        ]
+        
+        for h in history:
+            messages.append({"role": h["role"], "content": h["content"]})
+        
+        if not history or history[-1]["content"] != message:
+            messages.append({"role": "user", "content": message})
+        
+        # Get response
+        response = self.model_router.call(
+            messages,
+            model=model,
+            user_api_key=user_api_key,
+            temperature=0.7,
+        )
+        
+        # Save response
+        self.db.save_message(user_id, "assistant", response.content)
+        
+        # Extract goals from messages if possible
+        self._extract_goals(user_id, message)
+        
+        # Check if should move to tracking stage
+        # After plan is created, move to tracking
+        message_count = len([m for m in history if m["role"] == "user"]) + 1
+        if message_count >= 3:
+            self.db.update_user_stage(user_id, "tracking")
+        
+        return response.content
+    
+    async def _handle_tracking(
+        self,
+        user_id: int,
+        message: str,
+        model: str,
+        user_api_key: str = None,
+    ) -> str:
+        """Handle tracking stage - daily check-ins and progress"""
+        # Save user message
+        self.db.save_message(user_id, "user", message)
+        
+        # Get recent context
+        history = self.db.get_recent_messages(user_id, 30)
+        
+        # Build messages
+        messages = [
+            {"role": "system", "content": get_prompt_for_stage("tracking")},
+        ]
+        
+        for h in history:
+            messages.append({"role": h["role"], "content": h["content"]})
+        
+        if not history or history[-1]["content"] != message:
+            messages.append({"role": "user", "content": message})
+        
+        # Get response
+        response = self.model_router.call(
+            messages,
+            model=model,
+            user_api_key=user_api_key,
+            temperature=0.7,
+        )
+        
+        # Save response
+        self.db.save_message(user_id, "assistant", response.content)
+        
+        return response.content
+    
+    def _extract_goals(self, user_id: int, message: str):
+        """Extract goals from user messages"""
+        # Simple extraction for now
+        # In production, use LLM to extract goals
+        goal_keywords = ["хочу", "моя цель", "цель", "добиться", "достичь"]
+        for keyword in goal_keywords:
+            if keyword in message.lower():
+                # Extract sentence or phrase after keyword
+                parts = message.lower().split(keyword, 1)
+                if len(parts) > 1:
+                    goal_text = parts[1].strip()[:200]
+                    if goal_text:
+                        self.db.add_goal(user_id, goal_text)
+                        logger.info(f"Extracted goal for user {user_id}: {goal_text[:50]}...")
+                        break
+    
+    def _get_paywall_message(self) -> str:
+        """Get paywall message"""
+        return """🔥 Ты уже прошёл бесплатный этап. Теперь — самое интересное.
 
-    def _handle_welcome(self, user_id: int, text: str) -> str:
-        """Welcome stage — get to know the user."""
-        # Check if user is trying to set a model preference
-        if text.lower().startswith("/model"):
-            return self._handle_model_change(user_id, text)
-        
-        # Store user's message
-        self.db.save_message(user_id, 'user', text)
-        
-        # Get history
-        history = self.db.get_history(user_id, 6)
-        
-        # Build context
-        context = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-        
-        # If user has already said something meaningful, move to reflection
-        if len(history) > 2:
-            self.db.update_user(user_id, stage='reflection')
-            prompt = f"{REFLECTION_PROMPT}\n\nИстория диалога:\n{context}\n\nПродолжи диалог."
-        else:
-            prompt = f"{WELCOME_PROMPT}\n\nПользователь написал: {text}\n\nОтветь."
-        
-        response = self.model.call(prompt, user_id)
-        self.db.save_message(user_id, 'assistant', response)
-        return response
+Что ты получишь, если продолжишь:
+✅ Ежедневные чекины — не дадим сбиться с пути
+✅ Глубокий анализ твоих целей и прогресса
+✅ Персонализированный план действий
+✅ Поддержку 24/7 — я всегда рядом
+✅ Доступ ко всем моделям ИИ (DeepSeek, GPT, Claude)
 
-    def _handle_reflection(self, user_id: int, text: str) -> str:
-        """Reflection stage — deep dive into user's psyche."""
-        # Store
-        self.db.save_message(user_id, 'user', text)
-        
-        # Get history
-        history = self.db.get_history(user_id, 20)
-        context = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-        
-        # Check if user said something like "I know what I want now"
-        keywords = ["знаю что хочу", "понял", "осознал", "теперь я знаю", "моя цель", "я хочу"]
-        if any(k in text.lower() for k in keywords):
-            self.db.update_user(user_id, stage='planning')
-            prompt = f"{PLANNING_PROMPT}\n\nИстория диалога:\n{context}\n\nПользователь сказал, что осознал свою цель. Помоги ему оформить её в план."
-        else:
-            prompt = f"{REFLECTION_PROMPT}\n\nИстория диалога:\n{context}\n\nПродолжи диалог."
-        
-        response = self.model.call(prompt, user_id)
-        self.db.save_message(user_id, 'assistant', response)
-        return response
+Попробуй 3 дня бесплатно — или оформи подписку сразу.
 
-    def _handle_planning(self, user_id: int, text: str) -> str:
-        """Planning stage — turn goals into action plan."""
-        self.db.save_message(user_id, 'user', text)
-        
-        # Check if user provided a goal
-        if "цель" in text.lower() or len(text) > 20:
-            # Try to extract goal
-            goal_text = text
-            self.db.add_goal(user_id, goal_text)
-        
-        history = self.db.get_history(user_id, 20)
-        context = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-        
-        goals = self.db.get_active_goals(user_id)
-        goals_text = "\n".join([f"- {g['goal_text']}" for g in goals]) if goals else "пока нет целей"
-        
-        # If user says they have a plan or ready to start
-        keywords = ["план готов", "начать", "готов", "приступаю", "поехали"]
-        if any(k in text.lower() for k in keywords):
-            self.db.update_user(user_id, stage='tracking')
-            prompt = f"{TRACKING_PROMPT}\n\nТвои цели:\n{goals_text}\n\nИстория диалога:\n{context}\n\nПользователь готов начать действовать. Поздравь и поддержи."
-        else:
-            prompt = f"{PLANNING_PROMPT}\n\nТвои цели:\n{goals_text}\n\nИстория диалога:\n{context}\n\nПомоги пользователю детализировать план действий."
-        
-        response = self.model.call(prompt, user_id)
-        self.db.save_message(user_id, 'assistant', response)
-        return response
-
-    def _handle_tracking(self, user_id: int, text: str) -> str:
-        """Tracking stage — daily check-ins and motivation."""
-        self.db.save_message(user_id, 'user', text)
-        
-        # Check for /checkin command
-        if text.startswith("/checkin"):
-            return self._handle_checkin(user_id, text)
-        
-        history = self.db.get_history(user_id, 20)
-        context = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-        
-        goals = self.db.get_active_goals(user_id)
-        goals_text = "\n".join([f"- {g['goal_text']}" for g in goals]) if goals else "пока нет целей"
-        
-        today_checkin = self.db.get_checkin_today(user_id)
-        checkin_status = "ещё не было чекина сегодня" if not today_checkin else f"чекин был: {today_checkin.get('progress', '')}"
-        
-        prompt = f"{TRACKING_PROMPT}\n\nТвои цели:\n{goals_text}\n\n{checkin_status}\n\nИстория диалога:\n{context}\n\nПродолжи диалог."
-        
-        response = self.model.call(prompt, user_id)
-        self.db.save_message(user_id, 'assistant', response)
-        return response
-
-    def _handle_checkin(self, user_id: int, text: str) -> str:
-        """Handle /checkin command."""
-        parts = text.split(" ", 1)
-        if len(parts) < 2:
-            return "📋 Напиши /checkin настроение(1-5) прогресс. Например: /checkin 4 сегодня хорошо поработал"
-        
-        try:
-            mood = int(parts[1][0])
-            progress = parts[1][1:].strip()
-        except:
-            return "📋 Формат: /checkin настроение(1-5) прогресс. Например: /checkin 4 сегодня хорошо"
-        
-        if mood < 1 or mood > 5:
-            return "📋 Настроение должно быть от 1 до 5."
-        
-        self.db.add_checkin(user_id, mood, progress)
-        return f"✅ Записал! Настроение: {mood}/5. Прогресс: {progress}.\n\nПродолжай двигаться к цели! 🚀"
-
-    def _handle_model_change(self, user_id: int, text: str) -> str:
-        """Handle model preference change."""
-        models = {"deepseek", "openai", "claude", "gpt"}
-        parts = text.split()
-        if len(parts) < 2:
-            return "📋 Доступные модели: deepseek, openai, claude.\nНапиши: /model deepseek\n\nИли если хочешь использовать свой ключ: /setkey OPENAI_ключ"
-        
-        model = parts[1].lower()
-        if model in models:
-            self.db.update_user(user_id, model_preference=model)
-            return f"✅ Модель переключена на {model}."
-        else:
-            return f"❌ Неизвестная модель. Доступны: deepseek, openai, claude."
-
-    def _show_paywall(self) -> str:
-        return TRIAL_END_PROMPT
-
-    def _handle_paywall(self, user_id: int, text: str) -> str:
-        """Handle paywall interactions."""
-        if "попробовать" in text.lower() or "бесплатно" in text.lower():
-            # Start trial
-            from datetime import date, timedelta
-            start = date.today()
-            end = start + timedelta(days=3)
-            self.db.update_user(user_id, status='trial', trial_start=start.isoformat(), trial_end=end.isoformat(), stage='reflection')
-            return "🎉 Отлично! У тебя 3 дня бесплатного доступа.\n\nДавай продолжим. Расскажи, что тебя сейчас беспокоит или волнует?"
-        
-        if "купить" in text.lower():
-            return "💳 Сейчас мы подключим оплату через ЮKassa.\n\nСсылка для оплаты: [пока заглушка — будет позже]\n\nНапиши 'оплатил', когда завершишь платёж."
-        
-        if "оплатил" in text.lower():
-            self.db.update_user(user_id, status='paid', stage='reflection')
-            return "🎉 Спасибо! Ты в программе.\n\nРасскажи, что тебя сейчас беспокоит или волнует?"
-        
-        return self._show_paywall()
+👇 Нажми кнопку ниже, чтобы начать трансформацию."""
+    
+    def _get_fallback_response(self) -> str:
+        """Get fallback response"""
+        return "Извини, я немного запутался. Давай начнём сначала. Расскажи, что тебя беспокоит или что ты хочешь изменить в жизни?"
