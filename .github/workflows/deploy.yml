@@ -33,21 +33,47 @@ jobs:
             export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
 
             # Determine deployment directory
-            DEPLOY_DIR="/opt/civis"
-            if [ ! -w "/opt" ] && [ ! -d "$DEPLOY_DIR" ]; then
+            if [ -d "/home/l/civis" ]; then
+              DEPLOY_DIR="/home/l/civis"
+            elif [ -d "$HOME/civis" ]; then
               DEPLOY_DIR="$HOME/civis"
+            elif [ -d "/opt/civis" ]; then
+              DEPLOY_DIR="/opt/civis"
+            else
+              DEPLOY_DIR="/home/l/civis"
             fi
             echo "DEPLOY_DIR: $DEPLOY_DIR"
 
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
 
+            # Backup critical local data before repository update
+            if [ -f "civis_bot/.env" ]; then
+              cp "civis_bot/.env" "civis_bot/.env.bak" 2>/dev/null || true
+            fi
+            if [ -f "civis_bot/civis_data.db" ]; then
+              cp "civis_bot/civis_data.db" "civis_bot/civis_data.db.bak" 2>/dev/null || true
+            fi
+
             # 1. Clone or update repository
             if [ ! -d ".git" ]; then
-              git clone https://github.com/LeonidYasin/civis.git .
+              echo "Initializing git tracking in existing $DEPLOY_DIR..."
+              git init
+              git remote add origin https://github.com/LeonidYasin/civis.git || git remote set-url origin https://github.com/LeonidYasin/civis.git
+              git fetch origin main
+              git reset origin/main
             else
+              git remote set-url origin https://github.com/LeonidYasin/civis.git || true
               git fetch origin main
               git reset --hard origin/main
+            fi
+
+            # Restore local database if needed
+            if [ ! -f "civis_bot/civis_data.db" ] && [ -f "civis_bot/civis_data.db.bak" ]; then
+              cp "civis_bot/civis_data.db.bak" "civis_bot/civis_data.db"
+            fi
+            if [ ! -f "civis_bot/.env" ] && [ -f "civis_bot/.env.bak" ]; then
+              cp "civis_bot/.env.bak" "civis_bot/.env"
             fi
 
             # 2. Configure Python environment
@@ -98,10 +124,18 @@ jobs:
               sudo systemctl daemon-reload
               sudo systemctl restart civis
             else
-              echo "Restarting via background nohup process..."
+              echo "Restarting via background process..."
               pkill -f "python3.*bot\.py" || true
               sleep 2
-              nohup python3 bot.py > bot.log 2>&1 &
+              PYTHON_BIN="python3"
+              if [ -x "$DEPLOY_DIR/civis_bot/venv/bin/python3" ]; then
+                PYTHON_BIN="$DEPLOY_DIR/civis_bot/venv/bin/python3"
+              elif [ -x "venv/bin/python3" ]; then
+                PYTHON_BIN="venv/bin/python3"
+              elif [ -x "$HOME/venv/bin/python3" ]; then
+                PYTHON_BIN="$HOME/venv/bin/python3"
+              fi
+              nohup $PYTHON_BIN bot.py > bot.log 2>&1 &
             fi
 
             sleep 3
