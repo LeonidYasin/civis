@@ -1,0 +1,112 @@
+name: Continuous Deployment (VPS Auto-Deploy)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Civis Bot to VPS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          BOT_SHARED_SECRET: ${{ secrets.BOT_SHARED_SECRET }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_PASSPHRASE }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          envs: VPS_PASSWORD,BOT_SHARED_SECRET
+          script: |
+            set -e
+            echo "🚀 Starting automated Civis deployment on VPS..."
+
+            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+
+            # Determine deployment directory
+            DEPLOY_DIR="/opt/civis"
+            if [ ! -w "/opt" ] && [ ! -d "$DEPLOY_DIR" ]; then
+              DEPLOY_DIR="$HOME/civis"
+            fi
+            echo "DEPLOY_DIR: $DEPLOY_DIR"
+
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
+
+            # 1. Clone or update repository
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/LeonidYasin/civis.git .
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            # 2. Configure Python environment
+            cd "$DEPLOY_DIR/civis_bot"
+            if [ -d "venv" ]; then
+              source venv/bin/activate
+            elif [ -d "$HOME/venv" ]; then
+              source "$HOME/venv/bin/activate"
+            fi
+
+            # Install or update requirements if pip is available
+            if command -v pip3 >/dev/null 2>&1; then
+              pip3 install -r requirements.txt || true
+            fi
+
+            # 3. Ensure MCP integration variables in .env
+            if [ ! -f ".env" ]; then
+              cp .env.example .env 2>/dev/null || touch .env
+            fi
+
+            # Inject BOT_SHARED_SECRET if passed from GitHub Secrets
+            if [ -n "$BOT_SHARED_SECRET" ]; then
+              if grep -q "BOT_SHARED_SECRET=" .env; then
+                sed -i "s|^BOT_SHARED_SECRET=.*|BOT_SHARED_SECRET=\"$BOT_SHARED_SECRET\"|" .env
+              else
+                echo "BOT_SHARED_SECRET=\"$BOT_SHARED_SECRET\"" >> .env
+              fi
+            fi
+
+            # Ensure local MCP endpoints are configured
+            if ! grep -q "MCP_URL=" .env; then
+              echo 'MCP_URL="http://127.0.0.1:3000/mcp"' >> .env
+            fi
+            if ! grep -q "MCP_REGISTER_URL=" .env; then
+              echo 'MCP_REGISTER_URL="http://127.0.0.1:3000/api/bot/register-user"' >> .env
+            fi
+
+            # 4. Restart Civis Bot service
+            echo "🔄 Restarting Civis bot process..."
+            if systemctl is-active --quiet civis 2>/dev/null; then
+              echo "Restarting via systemd service 'civis'..."
+              sudo systemctl restart civis
+            elif systemctl is-active --quiet civis-bot 2>/dev/null; then
+              echo "Restarting via systemd service 'civis-bot'..."
+              sudo systemctl restart civis-bot
+            elif [ -f /etc/systemd/system/civis.service ]; then
+              echo "Starting systemd service /etc/systemd/system/civis.service..."
+              sudo systemctl daemon-reload
+              sudo systemctl restart civis
+            else
+              echo "Restarting via background nohup process..."
+              pkill -f "python3.*bot\.py" || true
+              sleep 2
+              nohup python3 bot.py > bot.log 2>&1 &
+            fi
+
+            sleep 3
+
+            echo "=== RUNTIME HEALTH CHECK ==="
+            pgrep -fl "bot\.py" || systemctl status civis --no-pager || true
+
+            echo "✅ Civis bot deployment completed successfully!"
