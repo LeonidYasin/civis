@@ -1,0 +1,11 @@
+# Civis local runtime and secrets
+civis_bot/.env
+civis_bot/*.bak
+civis_bot/*.log
+civis_bot/civis_data.db
+civis_bot/venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
