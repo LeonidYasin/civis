@@ -318,7 +318,15 @@ def handle_survey(message: Message):
     
     elif state == 'offer':
         category = data.get('category', 'general')
-        save_offer(tg_id, text, category=category)
+        offer_id = save_offer(tg_id, text, category=category)
+        try:
+            from mcp_client import map_civis_to_mcp_listing, trigger_background_sync
+            user = get_user(tg_id)
+            payload = map_civis_to_mcp_listing("offer", {"id": offer_id, "text": text, "category": category}, user)
+            trigger_background_sync(tg_id, "offer", offer_id, payload)
+        except Exception as e:
+            logger.warning(f"Failed to enqueue offer to Marketplace OS: {e}")
+
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
@@ -329,7 +337,15 @@ def handle_survey(message: Message):
     
     elif state == 'request':
         category = data.get('category', 'general')
-        save_request(tg_id, text, category=category)
+        req_id = save_request(tg_id, text, category=category)
+        try:
+            from mcp_client import map_civis_to_mcp_listing, trigger_background_sync
+            user = get_user(tg_id)
+            payload = map_civis_to_mcp_listing("request", {"id": req_id, "text": text, "category": category}, user)
+            trigger_background_sync(tg_id, "request", req_id, payload)
+        except Exception as e:
+            logger.warning(f"Failed to enqueue request to Marketplace OS: {e}")
+
         lang = get_user(tg_id).get('language', 'en')
         bot.reply_to(
             message,
