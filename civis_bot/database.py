@@ -44,6 +44,26 @@ def init_db():
     if 'openai_key' not in columns:
         cur.execute("ALTER TABLE users ADD COLUMN openai_key TEXT")
         logger.info("Added 'openai_key' column to users table")
+    if 'mcr_key' not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN mcr_key TEXT")
+        logger.info("Added 'mcr_key' column to users table")
+
+    # Queue table for dual-write resilience to Marketplace OS
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS pending_marketplace_sync (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tg_id INTEGER NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            retry_count INTEGER DEFAULT 0,
+            error_message TEXT,
+            mcp_listing_id TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    """)
     
     # Sessions table
     cur.execute("""
@@ -344,9 +364,10 @@ def save_offer(tg_id, text, category='general', **kwargs):
     
     placeholders = ', '.join(['?'] * len(values))
     cur.execute(f"INSERT INTO offers ({', '.join(fields)}) VALUES ({placeholders})", values)
-    
+    offer_id = cur.lastrowid
     conn.commit()
     conn.close()
+    return offer_id
 
 def get_all_offers(category=None):
     conn = sqlite3.connect(DB_PATH)
@@ -402,9 +423,10 @@ def save_request(tg_id, text, category='general', **kwargs):
     
     placeholders = ', '.join(['?'] * len(values))
     cur.execute(f"INSERT INTO requests ({', '.join(fields)}) VALUES ({placeholders})", values)
-    
+    req_id = cur.lastrowid
     conn.commit()
     conn.close()
+    return req_id
 
 def get_all_requests(category=None):
     conn = sqlite3.connect(DB_PATH)

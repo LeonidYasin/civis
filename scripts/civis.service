@@ -1,0 +1,17 @@
+[Unit]
+Description=Civis Telegram Bot (Marketplace OS Gateway)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/civis/civis_bot
+ExecStart=/usr/bin/python3 bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=-/opt/civis/civis_bot/.env
+
+[Install]
+WantedBy=multi-user.target
