@@ -113,11 +113,17 @@ jobs:
 
             # 4. Restart Civis Bot service
             echo "🔄 Restarting Civis bot process..."
-            if systemctl is-active --quiet civis 2>/dev/null; then
-              echo "Restarting via systemd service 'civis'..."
+            if systemctl --user is-active --quiet civis 2>/dev/null; then
+              echo "Restarting via systemctl --user civis..."
+              systemctl --user restart civis
+            elif systemctl --user is-active --quiet civis-bot 2>/dev/null; then
+              echo "Restarting via systemctl --user civis-bot..."
+              systemctl --user restart civis-bot
+            elif systemctl is-active --quiet civis 2>/dev/null; then
+              echo "Restarting via systemctl civis..."
               sudo systemctl restart civis
             elif systemctl is-active --quiet civis-bot 2>/dev/null; then
-              echo "Restarting via systemd service 'civis-bot'..."
+              echo "Restarting via systemctl civis-bot..."
               sudo systemctl restart civis-bot
             elif [ -f /etc/systemd/system/civis.service ]; then
               echo "Starting systemd service /etc/systemd/system/civis.service..."
@@ -125,7 +131,12 @@ jobs:
               sudo systemctl restart civis
             else
               echo "Restarting via background process..."
-              pkill -f "python3.*bot\.py" || true
+              # Safely terminate previous python bot.py instance (excluding current script)
+              for pid in $(pgrep -f "bot\.py" 2>/dev/null || true); do
+                if [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ]; then
+                  kill "$pid" 2>/dev/null || true
+                fi
+              done
               sleep 2
               PYTHON_BIN="python3"
               if [ -x "$DEPLOY_DIR/civis_bot/venv/bin/python3" ]; then
@@ -135,7 +146,8 @@ jobs:
               elif [ -x "$HOME/venv/bin/python3" ]; then
                 PYTHON_BIN="$HOME/venv/bin/python3"
               fi
-              nohup $PYTHON_BIN bot.py > bot.log 2>&1 &
+              echo "Using Python: $PYTHON_BIN"
+              nohup "$PYTHON_BIN" bot.py </dev/null > bot.log 2>&1 &
             fi
 
             sleep 3
