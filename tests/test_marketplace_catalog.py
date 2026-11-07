@@ -423,7 +423,7 @@ def test_marketplace_back_preserves_original_filter_not_offer_category(bot_sessi
     ("mkt:v:{id}:all:1", None),
     ("mkt:cats", None),
     ("hub:mkt:confirm", "offer"),   # FSM: clear session + render
-    ("hub:mkt:confirm", None),      # IDLE: direct render
+    ("hub:mkt", None),              # IDLE: direct render without confirmation
 ])
 def test_marketplace_dispatcher_routing(bot_session, cb_template, setup_state):
     """Callback updates are routed directly to handlers without catch-all interception."""
