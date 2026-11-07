@@ -17,6 +17,7 @@ from database import (
     get_my_offers, get_my_requests,
     save_offer, save_request, delete_offer, delete_request,
     soft_delete_offer, soft_delete_request,
+    get_catalog_page, get_catalog_count, get_offer_with_author,
     DB_PATH
 )
 from locales import TEXTS
@@ -27,9 +28,64 @@ from keyboards import (
 from utils import get_text
 import mcp_client
 
-from .helpers import log_message, bot, safe_edit_message
+from .helpers import (
+    log_message, bot, safe_edit_message,
+    normalize_username, extract_title
+)
 
 logger = logging.getLogger(__name__)
+
+# --- CATEGORY CONSTANTS & SYNONYMS ---
+
+CATEGORY_SYNONYMS = {
+    'business': ['business', 'Бизнес', 'бизнес'],
+    'jobs': ['jobs', 'job', 'work', 'Работа', 'работа', 'Вакансии', 'вакансии'],
+    'services': ['services', 'service', 'Услуги', 'услуги'],
+    'real_estate': ['real_estate', 'realty', 'Недвижимость', 'недвижимость'],
+    'things': ['things', 'goods', 'Товары', 'товары', 'Вещи', 'вещи'],
+    'rides': ['rides', 'taxi', 'Такси', 'такси', 'Поездки', 'поездки'],
+    'delivery': ['delivery', 'Доставка', 'доставка'],
+    'communities': ['communities', 'community', 'Сообщества', 'сообщества'],
+    'dating': ['dating', 'Знакомства', 'знакомства', 'Дейтинг', 'дейтинг'],
+    'other': ['other', 'general', 'Другое', 'другое', 'Общее', 'общее'],
+}
+
+KNOWN_CATS = set(CATEGORY_SYNONYMS.keys()) | {'all'}
+
+CATEGORY_LABELS = {
+    'all': '🌐 Все категории',
+    'services': '🛠 Услуги',
+    'business': '💼 Бизнес',
+    'jobs': '💻 Работа',
+    'real_estate': '🏠 Недвижимость',
+    'things': '📦 Товары / Вещи',
+    'rides': '🚕 Поездки',
+    'delivery': '🚚 Доставка',
+    'communities': '👥 Сообщества',
+    'dating': '❤️ Знакомства',
+    'other': '📁 Другое',
+}
+
+COOLDOWN_BY_PREFIX = {
+    "mkt:cat": 0.08,
+    "mkt:v": 0.15,
+    "mkt:cats": 0.30,
+}
+
+
+def _safe_cat(cat) -> str:
+    if isinstance(cat, str) and (cat in KNOWN_CATS):
+        return cat
+    return "all"
+
+
+def _safe_page(p) -> int:
+    try:
+        val = int(p)
+        return max(1, val)
+    except (ValueError, TypeError):
+        return 1
+
 
 # --- COMMAND HANDLERS ---
 
@@ -231,6 +287,193 @@ def render_marketplace_hub(chat_id: int, message_id: Optional[int] = None):
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
 
 
+def render_marketplace_catalog(
+    chat_id: int,
+    tg_id: int,
+    cat: str = "all",
+    requested_page: int = 1,
+    message_id: Optional[int] = None
+):
+    """
+    Renders 5-item paginated public catalog screen with category filter.
+    """
+    safe_cat = _safe_cat(cat)
+    page = _safe_page(requested_page)
+
+    category_slugs = None if safe_cat == "all" else CATEGORY_SYNONYMS.get(safe_cat, [safe_cat])
+    total_count = get_catalog_count(category_slugs)
+
+    if total_count == 0:
+        cat_label = CATEGORY_LABELS.get(safe_cat, safe_cat)
+        text = (
+            f"🛒 <b>Маркетплейс Civis</b>\n"
+            f"Категория: <b>{html.escape(cat_label)}</b>\n\n"
+            f"В этой категории пока нет объявлений (пусто)."
+        )
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📂 Все категории", callback_data="mkt:cat:all:1"))
+        markup.row(InlineKeyboardButton("🔙 В меню", callback_data="hub:mkt"))
+        if message_id:
+            safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+        else:
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+        return
+
+    limit = 5
+    total_pages = (total_count + limit - 1) // limit
+    if page > total_pages:
+        page = total_pages
+    if page < 1:
+        page = 1
+
+    offset = (page - 1) * limit
+    items = get_catalog_page(category_slugs, limit=limit, offset=offset)
+
+    cat_label = CATEGORY_LABELS.get(safe_cat, safe_cat)
+    text_lines = [
+        f"🛒 <b>Маркетплейс Civis</b> [ {page} / {total_pages} ]",
+        f"Категория: <b>{html.escape(cat_label)}</b> (всего: {total_count})\n",
+    ]
+
+    item_buttons = []
+    for i, item in enumerate(items, 1):
+        title = extract_title(item["text"])
+        escaped_title = html.escape(title)
+        price_val = item["price"]
+        price_str = f" — <i>{price_val} ₽</i>" if price_val is not None else ""
+        text_lines.append(f"{i}. <b>{escaped_title}</b>{price_str}")
+        item_buttons.append(
+            InlineKeyboardButton(
+                text=f"[ {i} ]",
+                callback_data=f"mkt:v:{item['id']}:{safe_cat}:{page}"
+            )
+        )
+
+    text = "\n".join(text_lines)
+
+    markup = InlineKeyboardMarkup()
+    if item_buttons:
+        markup.row(*item_buttons)
+
+    prev_cb = "noop" if page <= 1 else f"mkt:cat:{safe_cat}:{page - 1}"
+    next_cb = f"mkt:cat:{safe_cat}:{page + 1}" if page < total_pages else "noop"
+    markup.row(
+        InlineKeyboardButton("◀", callback_data=prev_cb),
+        InlineKeyboardButton(f"{page} / {total_pages}", callback_data="noop"),
+        InlineKeyboardButton("▶", callback_data=next_cb)
+    )
+
+    markup.row(
+        InlineKeyboardButton("📂 Категории", callback_data="mkt:cats"),
+        InlineKeyboardButton("🔙 В меню", callback_data="hub:mkt")
+    )
+
+    if message_id:
+        safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+    else:
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+
+
+def render_categories_menu(chat_id: int, message_id: Optional[int] = None):
+    """
+    Renders 11-button category selector menu (All + 10 slugs in 2 columns).
+    """
+    text = "📂 <b>Выберите категорию каталога:</b>"
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("🌐 Все категории", callback_data="mkt:cat:all:1"))
+
+    slugs = ['services', 'business', 'jobs', 'real_estate', 'things', 'rides', 'delivery', 'communities', 'dating', 'other']
+    for i in range(0, len(slugs), 2):
+        row_btns = []
+        s1 = slugs[i]
+        row_btns.append(InlineKeyboardButton(CATEGORY_LABELS.get(s1, s1), callback_data=f"mkt:cat:{s1}:1"))
+        if i + 1 < len(slugs):
+            s2 = slugs[i + 1]
+            row_btns.append(InlineKeyboardButton(CATEGORY_LABELS.get(s2, s2), callback_data=f"mkt:cat:{s2}:1"))
+        markup.row(*row_btns)
+
+    markup.row(InlineKeyboardButton("🔙 В каталог", callback_data="mkt:cat:all:1"))
+
+    if message_id:
+        safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+    else:
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+
+
+def render_marketplace_card(
+    chat_id: int,
+    tg_id: int,
+    offer_id: int,
+    cat: str = "all",
+    page: int = 1,
+    message_id: Optional[int] = None,
+    call_id: Optional[str] = None
+):
+    """
+    Renders detail card for a single offer with author username URL or anonymous note.
+    """
+    safe_cat = _safe_cat(cat)
+    safe_p = _safe_page(page)
+
+    offer = get_offer_with_author(offer_id)
+    if not offer:
+        if call_id:
+            try:
+                bot.answer_callback_query(call_id, text="Объявление больше недоступно.", show_alert=True)
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call_id}: {e}")
+        render_marketplace_catalog(chat_id, tg_id, cat=safe_cat, requested_page=safe_p, message_id=message_id)
+        return
+
+    raw_text = offer["text"] or ""
+    title = extract_title(raw_text)
+    escaped_title = html.escape(title)
+
+    author_username = normalize_username(offer["username"])
+    has_username = bool(author_username)
+
+    if len(raw_text) > 800:
+        truncated_text = raw_text[:800] + "..."
+        if has_username:
+            overflow_note = "\n\n<i>(Текст сокращен, свяжитесь с автором)</i>"
+        else:
+            overflow_note = "\n\n<i>(Текст сокращен)</i>"
+    else:
+        truncated_text = raw_text
+        overflow_note = ""
+
+    escaped_desc = html.escape(truncated_text)
+
+    category_slug = offer["category"] or "other"
+    category_label = CATEGORY_LABELS.get(category_slug, category_slug)
+    price_val = offer["price"]
+    price_text = f"<b>Цена:</b> {price_val} ₽\n" if price_val is not None else ""
+    created_at = str(offer["created_at"])[:10] if offer["created_at"] else ""
+
+    contact_note = ""
+    if not has_username:
+        contact_note = "\n<i>(Автор не указал публичный контакт)</i>\n"
+
+    card_text = (
+        f"📌 <b>{escaped_title}</b>\n\n"
+        f"<b>Категория:</b> {html.escape(category_label)}\n"
+        f"{price_text}\n"
+        f"{escaped_desc}{overflow_note}\n"
+        f"{contact_note}\n"
+        f"<i>Создано: {created_at}</i>"
+    )
+
+    markup = InlineKeyboardMarkup()
+    if has_username:
+        markup.row(InlineKeyboardButton("💬 Написать автору", url=f"https://t.me/{author_username}"))
+    markup.row(InlineKeyboardButton("⬅ К списку", callback_data=f"mkt:cat:{safe_cat}:{safe_p}"))
+
+    if message_id:
+        safe_edit_message(bot, chat_id, message_id, card_text, reply_markup=markup, parse_mode='HTML')
+    else:
+        bot.send_message(chat_id, card_text, reply_markup=markup, parse_mode='HTML')
+
+
 def handle_marketplace_callbacks(call: CallbackQuery):
     """Unified callback query handler for marketplace pagination, deletion and navigation."""
     tg_id = call.from_user.id
@@ -240,11 +483,19 @@ def handle_marketplace_callbacks(call: CallbackQuery):
 
     # 1. Anti-flood click throttle check
     action_key = data.split(":")[0] if ":" in data else data
-    if CLICK_TRACKER.is_throttled(tg_id, action_key):
+    if data.startswith("mkt:cat"):
+        action_key = "mkt:cat"
+    elif data.startswith("mkt:v"):
+        action_key = "mkt:v"
+    elif data.startswith("mkt:cats"):
+        action_key = "mkt:cats"
+
+    cooldown = COOLDOWN_BY_PREFIX.get(action_key, 1.0)
+    if CLICK_TRACKER.is_throttled(tg_id, action_key, custom_window=cooldown):
         try:
             bot.answer_callback_query(call.id, text="Слишком частые клики, подождите...")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
         return
 
     # 2. FSM Policy check
@@ -255,31 +506,115 @@ def handle_marketplace_callbacks(call: CallbackQuery):
         if data == "noop":
             try:
                 bot.answer_callback_query(call.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
             return
         elif data.startswith("cxl_del:"):
             pass  # Allowed without clearing session
-        elif data == "hub:mkt" or data.startswith("hub:"):
-            # Escape hatch: clear session to IDLE and proceed
+        elif data == "hub:mkt":
+            # Confirmation dialog in active FSM
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+            text = (
+                "⚠️ <b>У вас есть несохранённый черновик!</b>\n\n"
+                "Вы находитесь в процессе заполнения формы. "
+                "Если перейти в маркетплейс, введённые данные будут сброшены.\n\n"
+                "Прервать заполнение и перейти в каталог?"
+            )
+            markup = InlineKeyboardMarkup()
+            markup.row(
+                InlineKeyboardButton("Да, перейти", callback_data="hub:mkt:confirm"),
+                InlineKeyboardButton("Отмена", callback_data="noop")
+            )
+            if message_id:
+                safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+            else:
+                bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+            return
+        elif data == "hub:mkt:confirm":
             clear_session(tg_id)
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+            render_marketplace_catalog(chat_id, tg_id, cat="all", requested_page=1, message_id=message_id)
+            return
+        elif data.startswith("mkt:"):
+            try:
+                bot.answer_callback_query(call.id, text="Пожалуйста, сначала завершите текущее действие.", show_alert=True)
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+            return
         elif data in ["act:offer", "act:request"] and state in ["offer_category", "request_category"]:
-            # Allowed to switch category selection
             pass
         else:
             try:
                 bot.answer_callback_query(call.id, text="Пожалуйста, сначала завершите текущее действие.", show_alert=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
             return
 
-    # 3. Handle data
+    # 3. Handle data in IDLE state
     if data == "noop":
         try:
             bot.answer_callback_query(call.id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
         return
+
+    if data == "hub:mkt:confirm":
+        clear_session(tg_id)
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+        render_marketplace_catalog(chat_id, tg_id, cat="all", requested_page=1, message_id=message_id)
+        return
+
+    if data == "hub:mkt":
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+        render_marketplace_catalog(chat_id, tg_id, cat="all", requested_page=1, message_id=message_id)
+        return
+
+    if data == "mkt:cats":
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+        render_categories_menu(chat_id, message_id=message_id)
+        return
+
+    if data.startswith("mkt:cat:"):
+        parts = data.split(":")
+        cat = parts[2] if len(parts) >= 3 else "all"
+        page = int(parts[3]) if len(parts) >= 4 and parts[3].isdigit() else 1
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+        render_marketplace_catalog(chat_id, tg_id, cat=cat, requested_page=page, message_id=message_id)
+        return
+
+    if data.startswith("mkt:v:"):
+        parts = data.split(":")
+        if len(parts) >= 5:
+            try:
+                offer_id = int(parts[2])
+            except ValueError:
+                offer_id = 0
+            cat = parts[3]
+            page = parts[4]
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+            render_marketplace_card(chat_id, tg_id, offer_id=offer_id, cat=cat, page=page, message_id=message_id, call_id=call.id)
+            return
 
     if data.startswith("pg:"):
         parts = data.split(":")
@@ -288,8 +623,8 @@ def handle_marketplace_callbacks(call: CallbackQuery):
             page = int(parts[2])
             try:
                 bot.answer_callback_query(call.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
             render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id)
         return
 
@@ -301,8 +636,8 @@ def handle_marketplace_callbacks(call: CallbackQuery):
             page = int(parts[3])
             try:
                 bot.answer_callback_query(call.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
             render_delete_confirm_screen(chat_id, message_id, entity_type, item_id, page)
         return
 
@@ -313,8 +648,8 @@ def handle_marketplace_callbacks(call: CallbackQuery):
             page = int(parts[3])
             try:
                 bot.answer_callback_query(call.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"answer_callback_query failed for {call.id}: {e}")
             render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id)
         return
 
@@ -331,8 +666,8 @@ def handle_marketplace_callbacks(call: CallbackQuery):
         set_session(tg_id, 'offer_category', {'language': 'ru'})
         try:
             bot.answer_callback_query(call.id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
         bot.send_message(
             chat_id,
             "Select the category for your offer:\n\nChoose from the buttons below:",
@@ -344,8 +679,8 @@ def handle_marketplace_callbacks(call: CallbackQuery):
         set_session(tg_id, 'request_category', {'language': 'ru'})
         try:
             bot.answer_callback_query(call.id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"answer_callback_query failed for {call.id}: {e}")
         bot.send_message(
             chat_id,
             "Select the category for your request:\n\nChoose from the buttons below:",
@@ -353,13 +688,13 @@ def handle_marketplace_callbacks(call: CallbackQuery):
         )
         return
 
-    if data == "hub:mkt":
-        try:
-            bot.answer_callback_query(call.id)
-        except Exception:
-            pass
-        render_marketplace_hub(chat_id, message_id)
-        return
+    # Fallback logging and alert for unhandled callback data
+    logger.warning(f"Unhandled callback_data received: '{data}' from tg_id={tg_id}")
+    try:
+        bot.answer_callback_query(call.id, "Unknown action")
+    except Exception as e:
+        logger.warning(f"answer_callback_query failed for {call.id}: {e}")
+
 
 
 def cmd_my_offers(message: Message):
@@ -425,41 +760,8 @@ def cmd_delete_request(message: Message):
 def cmd_marketplace(message: Message):
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
-    offers = get_all_offers()
-    requests = get_all_requests()
-    
-    text = "🛒 Marketplace:\n\n"
-    text += "📦 Offers:\n"
-    if offers:
-        for row in offers[:5]:
-            if len(row) >= 5:
-                id, tg_id, category, offer_text, _ = row[:5]
-            else:
-                tg_id, offer_text, _ = row
-                id = '?'
-                category = 'general'
-            user = get_user(tg_id)
-            name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {offer_text}\n"
-    else:
-        text += "  (none)\n"
-    
-    text += "\n📥 Requests:\n"
-    if requests:
-        for row in requests[:5]:
-            if len(row) >= 5:
-                id, tg_id, category, req_text, _ = row[:5]
-            else:
-                tg_id, req_text, _ = row
-                id = '?'
-                category = 'general'
-            user = get_user(tg_id)
-            name = user.get('name', 'Unknown') if user else 'Unknown'
-            text += f"  - #{id} [{category}] {name}: {req_text}\n"
-    else:
-        text += "  (none)\n"
-    
-    bot.reply_to(message, text)
+    render_marketplace_catalog(chat_id=message.chat.id, tg_id=tg_id, cat="all", requested_page=1, message_id=None)
+
 
 def cmd_offers(message: Message):
     log_message(message, "[CMD]")

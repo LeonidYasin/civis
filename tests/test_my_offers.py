@@ -410,10 +410,12 @@ def test_callback_rejected_in_active_fsm(bot_session):
     state, _ = database.get_session(tg_id)
     assert state == "offer"
 
-    # 6. hub:mkt allowed and clears session (escape hatch)
+    # 6. hub:mkt asks confirmation in active FSM; hub:mkt:confirm clears session (escape hatch)
     recorder.clear()
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "hub:mkt")
+    CLICK_TRACKER.clear()
+    driver.click_button(tg_id, "hub:mkt:confirm")
     state, _ = database.get_session(tg_id)
     assert state is None or state == "IDLE"
 
