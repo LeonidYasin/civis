@@ -77,6 +77,44 @@ def test_marketplace_catalog_default_page_1_shows_5_active_offers(bot_session):
 
 
 # ---------------------------------------------------------------------------
+# Test 1b: Opens catalog from IDLE state via callback
+# ---------------------------------------------------------------------------
+def test_marketplace_opens_from_idle_state(bot_session):
+    """mkt:cat:all:1 in IDLE state triggers catalog render with offers."""
+    driver, recorder, _, _ = bot_session
+    tg_id = 777150
+    seed_user(tg_id)
+    for i in range(1, 4):
+        database.save_offer(tg_id, f"Idle Offer {i}\nDetails", category="services")
+    database.set_session(tg_id, None, {})
+
+    recorder.clear()
+    CLICK_TRACKER.clear()
+    update_json = {
+        "update_id": 990150,
+        "callback_query": {
+            "id": "cb_idle_open",
+            "from": {"id": tg_id, "is_bot": False, "first_name": "Test"},
+            "message": {
+                "message_id": 6001,
+                "date": 100000,
+                "chat": {"id": tg_id, "type": "private"},
+                "text": "Initial text"
+            },
+            "chat_instance": f"ci_{tg_id}",
+            "data": "mkt:cat:all:1"
+        }
+    }
+    driver.bot.process_new_updates([Update.de_json(update_json)])
+
+    assert any(r.method == "edit_message_text" for r in recorder.records)
+    last_text = recorder.last_text or ""
+    assert "маркетплейс" in last_text.lower() or "marketplace" in last_text.lower()
+    callbacks = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
+    assert any(c.startswith("mkt:v:") for c in callbacks)
+
+
+# ---------------------------------------------------------------------------
 # Test 2: Pagination next and prev
 # ---------------------------------------------------------------------------
 def test_marketplace_catalog_pagination_next_prev(bot_session):
@@ -378,21 +416,27 @@ def test_marketplace_back_preserves_original_filter_not_offer_category(bot_sessi
 
 
 # ---------------------------------------------------------------------------
-# Test 14: Dispatcher routing (parametrized across all marketplace callbacks)
+# Test 14: Dispatcher routing (parametrized across all marketplace callbacks & states)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("cb_template", [
-    "mkt:cat:all:1",
-    "mkt:v:{id}:all:1",
-    "mkt:cats",
-    "hub:mkt:confirm",
+@pytest.mark.parametrize("cb_template,setup_state", [
+    ("mkt:cat:all:1", None),
+    ("mkt:v:{id}:all:1", None),
+    ("mkt:cats", None),
+    ("hub:mkt:confirm", "offer"),   # FSM: clear session + render
+    ("hub:mkt:confirm", None),      # IDLE: direct render
 ])
-def test_marketplace_dispatcher_routing(bot_session, cb_template):
+def test_marketplace_dispatcher_routing(bot_session, cb_template, setup_state):
     """Callback updates are routed directly to handlers without catch-all interception."""
     driver, recorder, _, _ = bot_session
     tg_id = 777114
     seed_user(tg_id)
     offer_id = database.save_offer(tg_id, "Dispatcher Route Item\nDetails", category="services")
     cb_data = cb_template.format(id=offer_id)
+
+    if setup_state:
+        database.set_session(tg_id, setup_state, {"draft": "in_progress"})
+    else:
+        database.set_session(tg_id, None, {})
 
     recorder.clear()
     CLICK_TRACKER.clear()
@@ -417,6 +461,11 @@ def test_marketplace_dispatcher_routing(bot_session, cb_template):
     answered = get_answered_callbacks(recorder)
     assert not any("unknown action" in (a.get("text") or "").lower() for a in answered)
     assert any(r.method == "edit_message_text" for r in recorder.records)
+
+    # In confirm cases, session must end up cleared to IDLE
+    if cb_template == "hub:mkt:confirm":
+        state, _ = database.get_session(tg_id)
+        assert state is None or state == "IDLE"
 
 
 # ---------------------------------------------------------------------------
@@ -463,9 +512,12 @@ def test_marketplace_html_escape_in_foreign_description(bot_session):
 
 
 # ---------------------------------------------------------------------------
-# Test 17: Marketplace callback rejected in active FSM
+# Test 17: Marketplace callback rejected in active FSM (parametrized)
+# Note: Phase 1 regression check - currently caught by catch-all in RED,
+# will be caught explicitly by marketplace callback handler in GREEN.
 # ---------------------------------------------------------------------------
-def test_marketplace_callback_rejected_in_active_fsm(bot_session):
+@pytest.mark.parametrize("cb", ["mkt:cat:all:1", "mkt:v:1:all:1", "mkt:cats"])
+def test_marketplace_callback_rejected_in_active_fsm(bot_session, cb):
     """Clicking mkt:* while in active FSM is blocked with warning toast."""
     driver, recorder, _, _ = bot_session
     tg_id = 777117
@@ -475,14 +527,17 @@ def test_marketplace_callback_rejected_in_active_fsm(bot_session):
 
     recorder.clear()
     CLICK_TRACKER.clear()
-    driver.click_button(tg_id, "mkt:cat:services:1")
+    driver.click_button(tg_id, cb)
 
     answered = get_answered_callbacks(recorder)
-    assert any("завершите" in (a.get("text") or "").lower() for a in answered)
+    assert any("завершите" in (a.get("text") or "").lower() and a.get("show_alert") is True for a in answered)
 
     state, data = database.get_session(tg_id)
     assert state == "offer"
     assert data.get("text") == "Draft in progress"
+
+    # Must NOT render catalog content over draft form
+    assert not any("каталог" in (r.text or "").lower() for r in recorder.records if r.method == "edit_message_text")
 
 
 # ---------------------------------------------------------------------------
@@ -574,7 +629,7 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
 # Test 21: Title truncation
 # ---------------------------------------------------------------------------
 def test_marketplace_title_truncation():
-    """Extracts first line as title, truncates to max 50 chars, and escapes HTML."""
+    """Extracts first line as raw title and truncates to max 50 chars."""
     if extract_title is None:
         pytest.fail("extract_title function not implemented in handlers.marketplace")
 
@@ -590,69 +645,65 @@ def test_marketplace_title_truncation():
     assert extract_title("") == "Объявление Civis"
     assert extract_title(None) == "Объявление Civis"
 
-    # HTML tags in title text must be escaped, not raw HTML
+    # Raw title keeps content without premature escaping; presentation layer handles escaping
     html_text = ("<b>bold</b>" * 20) + "\nDesc"
     title_res = extract_title(html_text)
-    assert "<b>" not in title_res
-    assert "&lt;b&gt;" in title_res
+    assert len(title_res) <= 50
+    assert title_res.endswith("...")
 
 
 # ---------------------------------------------------------------------------
-# Test 22: Card text overflow truncation
+# Test 22: Card text overflow truncation (parametrized by has_username)
 # ---------------------------------------------------------------------------
-def test_marketplace_card_text_overflow_truncation(bot_session):
+@pytest.mark.parametrize("has_username,expected_note", [
+    (True, "свяжитесь с автором"),
+    (False, "Текст сокращен"),
+])
+def test_marketplace_card_text_overflow_truncation(bot_session, has_username, expected_note):
     """Descriptions exceeding 800 chars are truncated to safe bounds."""
     driver, recorder, _, _ = bot_session
-    # Case 1: author has username -> includes 'свяжитесь с автором'
-    author_id_1 = 888122
+    author_id = 888122 if has_username else 888123
     viewer_id = 777122
-    seed_user(author_id_1, username="big_author")
+    uname = "big_author" if has_username else None
+    seed_user(author_id, username=uname)
     seed_user(viewer_id)
 
-    giant_text_1 = "Paragraph One Header\n" + ("B" * 2000)
-    offer_id_1 = database.save_offer(author_id_1, giant_text_1, category="other")
+    giant_text = "Paragraph One Header\n" + ("B" * 2000)
+    offer_id = database.save_offer(author_id, giant_text, category="other")
 
     recorder.clear()
     CLICK_TRACKER.clear()
-    driver.click_button(viewer_id, f"mkt:v:{offer_id_1}:all:1")
+    driver.click_button(viewer_id, f"mkt:v:{offer_id}:all:1")
 
-    last_text_1 = recorder.last_text or ""
-    assert ("B" * 1000) not in last_text_1
-    assert "свяжитесь с автором" in last_text_1
-
-    # Case 2: author has NO username -> 'Текст сокращен' WITHOUT 'свяжитесь с автором'
-    author_id_2 = 888123
-    seed_user(author_id_2, username=None)
-    giant_text_2 = "Paragraph One Header\n" + ("C" * 2000)
-    offer_id_2 = database.save_offer(author_id_2, giant_text_2, category="other")
-
-    recorder.clear()
-    CLICK_TRACKER.clear()
-    driver.click_button(viewer_id, f"mkt:v:{offer_id_2}:all:1")
-
-    last_text_2 = recorder.last_text or ""
-    assert ("C" * 1000) not in last_text_2
-    assert "Текст сокращен" in last_text_2
-    assert "свяжитесь с автором" not in last_text_2
+    last_text = recorder.last_text or ""
+    # Raw 2000 B's must not be present
+    assert ("B" * 1000) not in last_text
+    assert expected_note in last_text
+    if not has_username:
+        assert "свяжитесь с автором" not in last_text
 
 
 # ---------------------------------------------------------------------------
 # Test 23: Card malformed back parameters
 # ---------------------------------------------------------------------------
 def test_marketplace_card_malformed_back_params(bot_session):
-    """Malformed category and page in mkt:v fallback safely to mkt:cat:all:1."""
+    """Malformed category and page in mkt:v render card and fallback safely to mkt:cat:all:1."""
     driver, recorder, _, _ = bot_session
     author_id = 888124
     viewer_id = 777124
     seed_user(author_id, username="normal_user")
     seed_user(viewer_id)
 
-    offer_id = database.save_offer(author_id, "Malformed Params Test\nDesc", category="services")
+    offer_id = database.save_offer(author_id, "Malformed Params Test\nDetails here", category="services")
 
     recorder.clear()
     CLICK_TRACKER.clear()
     driver.click_button(viewer_id, f"mkt:v:{offer_id}:invalid_category:xyz")
 
+    # (a) Card renders properly (not rejected on bad category parameter)
+    last_text = recorder.last_text or ""
+    assert "Malformed Params Test" in last_text
+
+    # (b) Safe back callback must default to all:1
     callbacks = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
-    # Safe back callback must be all:1
     assert "mkt:cat:all:1" in callbacks
