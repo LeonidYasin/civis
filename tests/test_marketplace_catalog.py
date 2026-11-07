@@ -615,12 +615,15 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     assert "hub:mkt:confirm" in callbacks
     assert "noop" in callbacks
 
-    # Step 2: Click cancel (noop) -> stays in FSM
+    # Step 2: Click cancel (noop) -> stays in FSM with draft intact
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "noop")
     state, data = database.get_session(tg_id)
     assert state == "offer"
     assert data.get("draft") == "Important content"
+    # Content must NOT be replaced by catalog on cancel
+    cancel_text = (recorder.last_text or "").lower()
+    assert "каталог объявлений" not in cancel_text
 
     # Step 3: Click confirm -> clears FSM and enters marketplace
     CLICK_TRACKER.clear()
@@ -628,9 +631,11 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     state, _ = database.get_session(tg_id)
     assert state is None or state == "IDLE"
 
-    # Verify confirm callback is answered
+    # Verify confirm callback is answered and catalog is rendered
     answered_3 = get_answered_callbacks(recorder)
     assert len(answered_3) >= 2
+    catalog_text = (recorder.last_text or "").lower()
+    assert "маркетплейс" in catalog_text or "marketplace" in catalog_text or "каталог" in catalog_text
 
 
 # ---------------------------------------------------------------------------
