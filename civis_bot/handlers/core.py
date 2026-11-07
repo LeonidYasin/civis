@@ -23,6 +23,7 @@ from keyboards import (
 )
 from utils import get_text, get_embedding_profile
 from config import get_proxy_url
+import mcp_client
 
 from .helpers import log_message, get_bot
 
@@ -219,12 +220,14 @@ def cmd_status(message: Message):
         cur.execute("SELECT COUNT(*) FROM requests")
         requests_count = cur.fetchone()[0]
         conn.close()
+        scanner_status = "Active" if mcp_client.is_scanner_alive() else "Inactive"
         bot.reply_to(
             message,
             f"🤖 Civis Bot\n\n"
             f"Citizens: {count}\n"
             f"Offers: {offers_count}\n"
             f"Requests: {requests_count}\n"
+            f"Sync Scanner: {scanner_status}\n"
             f"Proxy: {get_proxy_url() or 'None'}"
         )
     except Exception as e:

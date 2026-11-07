@@ -1011,3 +1011,52 @@ def test_create_path_mcp_failure_keeps_pending(publish_mock, mcr_key_mock, db_pa
     assert offer_row[0] == "active"
     assert offer_row[1] is None
     conn.close()
+
+
+def test_dispatcher_routes_pg_callback_to_marketplace(bot_session, mcp_mock, mcr_key_mock):
+    """
+    (Test 34) Verifies that the telebot dispatcher routes pg:o:2 callback query directly to
+    handle_marketplace_callbacks without being swallowed by legacy menu callback handlers,
+    answering without 'Unknown action' and rendering page 2.
+    """
+    driver, recorder, _, db_path = bot_session
+    tg_id = 777001
+    seed_user(tg_id)
+
+    database.save_offer(tg_id, "Offer Page 1 item", category="services")
+    database.save_offer(tg_id, "Offer Page 2 item", category="goods")
+
+    driver.send_text(tg_id, "/my_offers")
+    msg_id = recorder.records[-1].kwargs.get("message_id") or 1001
+
+    from telebot.types import Update
+    update_json = {
+        "update_id": 9999,
+        "callback_query": {
+            "id": "cb_dispatcher_test",
+            "from": {"id": tg_id, "is_bot": False, "first_name": "TestCitizen", "username": "testuser"},
+            "message": {
+                "message_id": msg_id,
+                "chat": {"id": tg_id, "type": "private"},
+                "date": int(time.time()),
+                "text": "menu"
+            },
+            "chat_instance": f"ci_{tg_id}",
+            "data": "pg:o:2"
+        }
+    }
+    update = Update.de_json(update_json)
+
+    recorder.clear()
+    CLICK_TRACKER.clear()
+    driver.bot.process_new_updates([update])
+
+    answer_queries = [r for r in recorder.records if r.method == "answer_callback_query"]
+    assert len(answer_queries) >= 1
+    assert "unknown action" not in (answer_queries[-1].text or "").lower()
+
+    edit_records = [r for r in recorder.records if r.method == "edit_message_text"]
+    assert len(edit_records) >= 1
+    assert "[ 2 / 2 ]" in (recorder.last_text or "")
+    assert "Offer Page 1 item" in (recorder.last_text or "")
+
