@@ -597,7 +597,7 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     tg_id = 777120
     seed_user(tg_id)
 
-    database.set_session(tg_id, "offer", {"draft": "Important content"})
+    database.set_session(tg_id, "offer", {"language": "ru", "category": "services"})
 
     # Step 1: Click hub:mkt
     recorder.clear()
@@ -620,7 +620,8 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     driver.click_button(tg_id, "noop")
     state, data = database.get_session(tg_id)
     assert state == "offer"
-    assert data.get("draft") == "Important content"
+    assert data.get("category") == "services"
+    assert data.get("language") == "ru"
     # Content must NOT be replaced by catalog on cancel
     cancel_text = (recorder.last_text or "").lower()
     assert "каталог объявлений" not in cancel_text
@@ -628,8 +629,9 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     # Step 3: Click confirm -> clears FSM and enters marketplace
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "hub:mkt:confirm")
-    state, _ = database.get_session(tg_id)
-    assert state is None or state == "IDLE"
+    state, data = database.get_session(tg_id)
+    assert state is None, f"state must be None, got {state!r}"
+    assert data == {}, f"session data must be cleared, got {data!r}"
 
     # Verify confirm callback is answered and catalog is rendered
     answered_3 = get_answered_callbacks(recorder)
