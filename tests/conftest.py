@@ -341,7 +341,7 @@ def bot_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # 4. MCP Mock queue & secret
     monkeypatch.setenv("BOT_SHARED_SECRET", "test_bot_secret")
     monkeypatch.setattr(mcp_client, "BOT_SHARED_SECRET", "test_bot_secret")
-    mcp_mock = MCPMockQueue(monkeypatch)
+    mcp_queue_mock = MCPMockQueue(monkeypatch)
 
     # 5. Wire into handlers
     handlers.set_bot(test_bot)
@@ -350,10 +350,133 @@ def bot_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     test_bot.callback_query_handlers.clear()
     handlers.register_handlers()
 
-    yield driver, recorder, mcp_mock, test_db_path
+    yield driver, recorder, mcp_queue_mock, test_db_path
 
     # Teardown
     try:
         test_bot.stop_polling()
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def no_scanner_thread(monkeypatch):
+    """Guarantees background scanner thread never auto-runs during test execution."""
+    if hasattr(mcp_client, "start_periodic_sync_scanner"):
+        monkeypatch.setattr(mcp_client, "start_periodic_sync_scanner", lambda **kw: None)
+    if hasattr(mcp_client, "stop_periodic_sync_scanner"):
+        mcp_client.stop_periodic_sync_scanner()
+
+
+@pytest.fixture
+def deferred_sync_pool(monkeypatch):
+    """
+    Deferred executor capturing background sync tasks without executing them,
+    allowing exact, deterministic race condition construction.
+    """
+    class DeferredSyncExecutor:
+        def __init__(self):
+            self.tasks = []
+        def submit(self, fn, *args, **kwargs):
+            self.tasks.append((fn, args, kwargs))
+            class DeferredFuture:
+                def result(self, timeout=None):
+                    return None
+            return DeferredFuture()
+
+    pool = DeferredSyncExecutor()
+    monkeypatch.setattr(mcp_client, "_sync_pool", pool)
+    return pool
+
+
+@pytest.fixture
+def synchronous_mcp_sync_pool(monkeypatch):
+    """
+    Synchronous inline executor immediately running background sync tasks in-thread.
+    """
+    class InlineSyncExecutor:
+        def submit(self, fn, *args, **kwargs):
+            fn(*args, **kwargs)
+            class ImmediateFuture:
+                def result(self, timeout=None):
+                    return None
+            return ImmediateFuture()
+
+    pool = InlineSyncExecutor()
+    monkeypatch.setattr(mcp_client, "_sync_pool", pool)
+    return pool
+
+
+@pytest.fixture
+def mcp_mock(monkeypatch):
+    """
+    Mock interceptor for all MCP JSON-RPC calls.
+    Prevents any network access to leonid-mcp.duckdns.org and allows testing
+    success, business errors, unexpected shapes, and network exceptions.
+    """
+    class McpMock:
+        def __init__(self):
+            self.calls = []
+            self.response = {"data": {"success": True, "status": "archived"}}
+
+        def __call__(self, key, tool, args):
+            self.calls.append((tool, args))
+            if isinstance(self.response, Exception):
+                raise self.response
+            return self.response
+
+    mock = McpMock()
+    monkeypatch.setattr(mcp_client, "mcp_json_rpc_call", mock)
+    return mock
+
+
+@pytest.fixture
+def publish_mock(monkeypatch):
+    """
+    Mocks publish_listing_pipeline for create-path tests.
+    Returns listing_id string or executes side_effect.
+    """
+    class PublishMock:
+        def __init__(self):
+            self.calls = []
+            self.side_effect = None
+            self.result = "lst-mock-100"
+
+        def __call__(self, key, payload):
+            self.calls.append((key, payload))
+            if self.side_effect:
+                return self.side_effect(key, payload)
+            return self.result
+
+    mock = PublishMock()
+    monkeypatch.setattr(mcp_client, "publish_listing_pipeline", mock)
+    return mock
+
+
+@pytest.fixture
+def mcr_key_mock(monkeypatch):
+    """
+    Prevents ensure_mcr_key from triggering HTTP POST /api/bot/register-user.
+    Returns a deterministic mock authorization key.
+    """
+    monkeypatch.setattr(mcp_client, "ensure_mcr_key", lambda tg_id, user_name=None: "mock-key-xyz")
+
+
+@pytest.fixture
+def db_path(tmp_path, monkeypatch):
+    """
+    Isolated SQLite database fixture for direct DB / MCP client tests.
+    """
+    test_db_path = tmp_path / "civis_test.db"
+    monkeypatch.setattr(database, "DB_PATH", test_db_path)
+    monkeypatch.setattr(mcp_client, "DB_PATH", test_db_path)
+    for mod_name in ["handlers.marketplace", "handlers.core", "handlers.dialogs"]:
+        if mod_name in sys.modules:
+            mod = sys.modules[mod_name]
+            if hasattr(mod, "DB_PATH"):
+                monkeypatch.setattr(mod, "DB_PATH", test_db_path)
+    database.init_db()
+    mcp_client.ensure_mcp_tables()
+    return test_db_path
+
+
