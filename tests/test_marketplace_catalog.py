@@ -31,6 +31,18 @@ def seed_user(tg_id: int, username: str = None, name: str = "Test User"):
     database.save_user(tg_id, username, name=name, status="completed")
 
 
+def get_answered_callbacks(recorder):
+    return [
+        {
+            "text": r.text,
+            "show_alert": r.kwargs.get("show_alert"),
+            "id": r.kwargs.get("callback_query_id"),
+        }
+        for r in recorder.records
+        if r.method == "answer_callback_query"
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Default page 1 shows 5 active offers
 # ---------------------------------------------------------------------------
@@ -170,6 +182,12 @@ def test_marketplace_categories_menu(bot_session):
     assert "mkt:cat:dating:1" in callbacks
     assert "mkt:cat:other:1" in callbacks
 
+    # Single source of truth check: menu matches KNOWN_CATS - {'all'}
+    slugs = {c.split(":")[2] for c in callbacks if c.startswith("mkt:cat:") and c != "mkt:cat:all:1"}
+    known = getattr(handlers.marketplace, "KNOWN_CATS", None)
+    if known:
+        assert slugs == set(known) - {"all"}
+
 
 # ---------------------------------------------------------------------------
 # Test 6: Empty filtered result
@@ -266,7 +284,7 @@ def test_marketplace_card_for_deleted_or_missing_listing(bot_session):
     driver.click_button(tg_id, "mkt:v:999999:all:1")
 
     # Toast / Alert check
-    answered = recorder.get_answered_callbacks()
+    answered = get_answered_callbacks(recorder)
     assert any(a.get("show_alert") is True and "недоступно" in (a.get("text") or "").lower() for a in answered)
 
 
@@ -360,18 +378,24 @@ def test_marketplace_back_preserves_original_filter_not_offer_category(bot_sessi
 
 
 # ---------------------------------------------------------------------------
-# Test 14: Dispatcher routing
+# Test 14: Dispatcher routing (parametrized across all marketplace callbacks)
 # ---------------------------------------------------------------------------
-def test_marketplace_dispatcher_routing(bot_session):
-    """mkt:cat:all:1 updates are routed directly to marketplace callback handler."""
+@pytest.mark.parametrize("cb_template", [
+    "mkt:cat:all:1",
+    "mkt:v:{id}:all:1",
+    "mkt:cats",
+    "hub:mkt:confirm",
+])
+def test_marketplace_dispatcher_routing(bot_session, cb_template):
+    """Callback updates are routed directly to handlers without catch-all interception."""
     driver, recorder, _, _ = bot_session
     tg_id = 777114
     seed_user(tg_id)
-    database.save_offer(tg_id, "Dispatcher Route Item\nDetails", category="services")
+    offer_id = database.save_offer(tg_id, "Dispatcher Route Item\nDetails", category="services")
+    cb_data = cb_template.format(id=offer_id)
 
     recorder.clear()
     CLICK_TRACKER.clear()
-    # Simulate direct telegram update delivery
     update_json = {
         "update_id": 990114,
         "callback_query": {
@@ -384,14 +408,15 @@ def test_marketplace_dispatcher_routing(bot_session):
                 "text": "Initial text"
             },
             "chat_instance": f"ci_{tg_id}",
-            "data": "mkt:cat:all:1"
+            "data": cb_data
         }
     }
     driver.bot.process_new_updates([Update.de_json(update_json)])
 
+    # Must NOT be intercepted by legacy catch-all toast
+    answered = get_answered_callbacks(recorder)
+    assert not any("unknown action" in (a.get("text") or "").lower() for a in answered)
     assert any(r.method == "edit_message_text" for r in recorder.records)
-    last_text = recorder.last_text or ""
-    assert "Dispatcher Route Item" in last_text
 
 
 # ---------------------------------------------------------------------------
@@ -452,7 +477,7 @@ def test_marketplace_callback_rejected_in_active_fsm(bot_session):
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "mkt:cat:services:1")
 
-    answered = recorder.get_answered_callbacks()
+    answered = get_answered_callbacks(recorder)
     assert any("завершите" in (a.get("text") or "").lower() for a in answered)
 
     state, data = database.get_session(tg_id)
@@ -488,6 +513,9 @@ def test_marketplace_author_without_users_row(bot_session):
 # ---------------------------------------------------------------------------
 def test_marketplace_username_normalization():
     """Validates Telegram username normalization against strict rules."""
+    if normalize_username is None:
+        pytest.fail("normalize_username function not implemented in handlers.marketplace")
+
     test_cases = [
         (None, None),
         ("", None),
@@ -546,7 +574,10 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
 # Test 21: Title truncation
 # ---------------------------------------------------------------------------
 def test_marketplace_title_truncation():
-    """Extracts first line as title and truncates to max 50 chars."""
+    """Extracts first line as title, truncates to max 50 chars, and escapes HTML."""
+    if extract_title is None:
+        pytest.fail("extract_title function not implemented in handlers.marketplace")
+
     # > 50 chars -> 47 + '...'
     long_text = ("a" * 100) + "\nSecond line"
     assert extract_title(long_text) == ("a" * 47) + "..."
@@ -558,6 +589,12 @@ def test_marketplace_title_truncation():
     # Empty text -> default fallback
     assert extract_title("") == "Объявление Civis"
     assert extract_title(None) == "Объявление Civis"
+
+    # HTML tags in title text must be escaped, not raw HTML
+    html_text = ("<b>bold</b>" * 20) + "\nDesc"
+    title_res = extract_title(html_text)
+    assert "<b>" not in title_res
+    assert "&lt;b&gt;" in title_res
 
 
 # ---------------------------------------------------------------------------
