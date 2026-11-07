@@ -55,66 +55,19 @@ def cmd_start(message: Message):
     )
 
 def cmd_menu(message: Message):
-    """Show full main menu with all commands as inline buttons"""
+    """Show citizen main menu hub or reminder in active FSM"""
     bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
-    user = get_user(tg_id)
-    if not user or user.get('status') != 'completed':
-        bot.reply_to(message, get_text(tg_id, 'no_profile'))
+    state, _ = get_session(tg_id)
+    if state and state != "IDLE":
+        bot.send_message(
+            message.chat.id,
+            "⚠️ У вас есть незавершённое действие. Завершите его или отправьте /cancel для отмены."
+        )
         return
-    
-    lang = user.get('language', 'en')
-    
-    # Full command list
-    text = "📋 **Civis Bot — Full Menu**\n\n"
-    text += "**Profile & Account**\n"
-    text += "`/start` — Create or view your profile\n"
-    text += "`/profile` — View your profile\n"
-    text += "`/survey` — Update your profile\n"
-    text += "`/embedding` — View AI embedding profile\n\n"
-    
-    text += "**Marketplace**\n"
-    text += "`/offer` — Publish an offer (with category)\n"
-    text += "`/offer_real_estate` — Quick real estate offer\n"
-    text += "`/offer_taxi` — Quick taxi offer\n"
-    text += "`/offer_delivery` — Quick delivery offer\n"
-    text += "`/request` — Publish a request\n"
-    text += "`/my_offers` — View your offers\n"
-    text += "`/my_requests` — View your requests\n"
-    text += "`/delete_offer <id>` — Delete your offer\n"
-    text += "`/delete_request <id>` — Delete your request\n"
-    text += "`/marketplace` — View marketplace\n"
-    text += "`/offers` — View all offers\n"
-    text += "`/requests` — View all requests\n\n"
-    
-    text += "**People & Search**\n"
-    text += "`/citizens` — List all citizens\n"
-    text += "`/search <text>` — Search citizens\n"
-    text += "`/match` — AI-powered matching\n\n"
-    
-    text += "**Subscriptions & AI**\n"
-    text += "`/subscribe` — View subscription plans\n"
-    text += "`/setkey <key>` — Set OpenAI API key\n"
-    text += "`/upload_dialog` — Upload dialog history\n"
-    text += "`/my_dialogs` — List uploaded dialogs\n"
-    text += "`/process_dialogs` — Process dialogs\n\n"
-    
-    text += "**Settings & Help**\n"
-    text += "`/language` — Change language\n"
-    text += "`/support` — Contact developer\n"
-    text += "`/status` — Bot status\n"
-    text += "`/help` — Help\n"
-    text += "`/cancel` — Cancel current operation\n"
-    text += "`/done` — Finish value selection\n"
-    
-    # Use inline keyboard for interactive menu (buttons execute immediately)
-    bot.reply_to(
-        message,
-        text,
-        parse_mode='Markdown',
-        reply_markup=get_inline_main_keyboard(lang)
-    )
+    from .hubs import render_hub_main
+    render_hub_main(message.chat.id, tg_id)
 
 def cmd_reload(message: Message):
     """Reload the bot (admin only)"""
@@ -237,8 +190,13 @@ def cmd_cancel(message: Message):
     bot = get_bot()
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
+    state, _ = get_session(tg_id)
     clear_session(tg_id)
-    bot.reply_to(message, get_text(tg_id, 'cancel'))
+    if state in ("settings_setkey", "settings_support"):
+        from .hubs import render_hub_settings
+        render_hub_settings(message.chat.id, tg_id)
+    else:
+        bot.reply_to(message, get_text(tg_id, 'cancel'))
 
 def cmd_done(message: Message):
     bot = get_bot()

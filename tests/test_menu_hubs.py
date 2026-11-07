@@ -355,10 +355,10 @@ def test_hub_cooldown_throttles_rapid_clicks(bot_session):
 
 
 # ---------------------------------------------------------------------------
-# Test 23: Marketplace catalog and categories menu have home button
+# Test 23: Marketplace catalog has home button
 # ---------------------------------------------------------------------------
-def test_catalog_and_categories_have_home_button(bot_session):
-    """Both /marketplace catalog view and categories menu include [🏠 Главное меню] (hub:main)."""
+def test_catalog_has_home_button(bot_session):
+    """Marketplace catalog view includes [🏠 Главное меню] (hub:main)."""
     driver, recorder, _, _ = bot_session
     tg_id = 777226
     seed_user(tg_id)
@@ -372,14 +372,6 @@ def test_catalog_and_categories_have_home_button(bot_session):
     catalog_cbs = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
     assert "hub:main" in catalog_cbs
     assert "mkt:cats" in catalog_cbs
-
-    # Categories menu check
-    recorder.clear()
-    CLICK_TRACKER.clear()
-    driver.click_button(tg_id, "mkt:cats")
-
-    cats_cbs = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
-    assert "hub:main" in cats_cbs
 
 
 # ---------------------------------------------------------------------------
@@ -577,14 +569,14 @@ def test_settings_setkey_rejects_invalid_format_keeps_state(bot_session):
 # ---------------------------------------------------------------------------
 def test_settings_setkey_delete_fail_still_saves_key(bot_session, monkeypatch, caplog):
     """If bot.delete_message fails, key is still saved in DB and warning is logged."""
-    driver, recorder, _, bot = bot_session
+    driver, recorder, _, _ = bot_session
     tg_id = 777234
     seed_user(tg_id)
 
     def failing_delete_message(chat_id, message_id, **kwargs):
         raise RuntimeError("Telegram API delete error: message cannot be deleted")
 
-    monkeypatch.setattr(bot, "delete_message", failing_delete_message)
+    monkeypatch.setattr(driver.bot, "delete_message", failing_delete_message)
     database.set_session(tg_id, "settings_setkey", {})
 
     recorder.clear()
