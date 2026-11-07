@@ -770,3 +770,28 @@ def test_cmd_subscribe_renders_hub_sub(bot_session):
 
     callbacks = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
     assert "hub:main" in callbacks
+
+
+# ---------------------------------------------------------------------------
+# Test 39: /status command displays scanner alive and diagnostic counts (Phase 1 compat)
+# ---------------------------------------------------------------------------
+def test_cmd_status_displays_scanner_and_counts(bot_session, monkeypatch):
+    """Sending /status displays diagnostic dashboard with scanner status, citizens, and counts."""
+    driver, recorder, _, _ = bot_session
+    tg_id = 777242
+    seed_user(tg_id)
+    database.save_offer(tg_id, "Offer Status\nDetails", category="services")
+    database.save_request(tg_id, "Request Status\nDetails", category="services")
+
+    import mcp_client
+    monkeypatch.setattr(mcp_client, "is_scanner_alive", lambda: True)
+
+    recorder.clear()
+    CLICK_TRACKER.clear()
+    driver.send_text(tg_id, "/status")
+
+    last_text = recorder.last_text or ""
+    assert "Sync Scanner: Active" in last_text
+    assert "Citizens:" in last_text
+    assert "Offers:" in last_text
+    assert "Requests:" in last_text
