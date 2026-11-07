@@ -3,8 +3,10 @@
 Helper functions for handlers.
 """
 
+import time
 import logging
 from telebot.types import Message
+from telebot.apihelper import ApiTelegramException
 
 logger = logging.getLogger(__name__)
 
@@ -43,3 +45,48 @@ def log_message(message: Message, prefix=""):
     logger.info(f"{prefix} msg from {tg_id} (@{username}) in {chat_type} (chat_id={chat_id}): {text[:50]}")
     if chat_type in ['group', 'supergroup']:
         logger.info(f"[GROUP] chat_id={chat_id}, title={message.chat.title or 'N/A'}")
+
+
+def safe_edit_message(bot_inst, chat_id, message_id, text, reply_markup=None, parse_mode='HTML') -> bool:
+    """
+    Safely edits an existing message with:
+    1. 'message is not modified' suppression -> returns True.
+    2. 429 rate limit retry with sleep(min(retry_after, 2)).
+    3. Fallback to send_message if message was deleted/not found.
+    """
+    attempts = 0
+    while attempts < 2:
+        attempts += 1
+        try:
+            bot_inst.edit_message_text(
+                text=text,
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode
+            )
+            return True
+        except ApiTelegramException as e:
+            desc = (e.description or "").lower()
+            if "message is not modified" in desc:
+                return True
+            if e.error_code == 429:
+                retry_after = 1
+                if hasattr(e, "result_json") and isinstance(e.result_json, dict):
+                    retry_after = e.result_json.get("parameters", {}).get("retry_after", 1)
+                time.sleep(min(float(retry_after), 2.0))
+                continue
+            if "message to edit not found" in desc or "message can't be edited" in desc or "message not found" in desc:
+                try:
+                    bot_inst.send_message(chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    return True
+                except Exception as send_err:
+                    logger.warning(f"Fallback send_message failed: {send_err}")
+                    return False
+            logger.warning(f"safe_edit_message error: {e}")
+            return False
+        except Exception as e:
+            logger.warning(f"Unexpected error in safe_edit_message: {e}")
+            return False
+    return False
+

@@ -17,6 +17,8 @@ DB_PATH = Path(__file__).parent / "civis_data.db"
 def init_db():
     """Initialize all database tables"""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA journal_mode=WAL")
     cur = conn.cursor()
     
     # Users table
@@ -125,6 +127,13 @@ def init_db():
     if 'property_rooms' not in offer_columns:
         cur.execute("ALTER TABLE offers ADD COLUMN property_rooms INTEGER")
         logger.info("Added 'property_rooms' column to offers table")
+    if 'status' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'active'")
+        logger.info("Added 'status' column to offers table")
+    if 'mcp_listing_id' not in offer_columns:
+        cur.execute("ALTER TABLE offers ADD COLUMN mcp_listing_id TEXT")
+        logger.info("Added 'mcp_listing_id' column to offers table")
+    cur.execute("UPDATE offers SET status = 'active' WHERE status IS NULL")
     
     # Requests table with category and extended fields
     cur.execute("""
@@ -175,6 +184,13 @@ def init_db():
     if 'property_rooms_max' not in req_columns:
         cur.execute("ALTER TABLE requests ADD COLUMN property_rooms_max INTEGER")
         logger.info("Added 'property_rooms_max' column to requests table")
+    if 'status' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN status TEXT DEFAULT 'active'")
+        logger.info("Added 'status' column to requests table")
+    if 'mcp_listing_id' not in req_columns:
+        cur.execute("ALTER TABLE requests ADD COLUMN mcp_listing_id TEXT")
+        logger.info("Added 'mcp_listing_id' column to requests table")
+    cur.execute("UPDATE requests SET status = 'active' WHERE status IS NULL")
     
     # Subscriptions table
     cur.execute("""
@@ -388,14 +404,28 @@ def get_all_offers(category=None):
 
 def get_my_offers(tg_id):
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
     cur = conn.cursor()
     cur.execute("""
-        SELECT id, category, text, price, property_type, property_area, property_address, property_rooms, created_at
-        FROM offers WHERE tg_id = ? ORDER BY created_at DESC
+        SELECT id, category, text, price, property_type, property_area, property_address, property_rooms, created_at, status, mcp_listing_id
+        FROM offers WHERE tg_id = ? AND (status IS NULL OR status = 'active') ORDER BY id DESC
     """, (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
+
+def soft_delete_offer(offer_id, tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE offers SET status = 'deleted_pending'
+        WHERE id = ? AND tg_id = ? AND (status IS NULL OR status = 'active')
+    """, (offer_id, tg_id))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
 
 def delete_offer(offer_id, tg_id):
     conn = sqlite3.connect(DB_PATH)
@@ -451,16 +481,30 @@ def get_all_requests(category=None):
 
 def get_my_requests(tg_id):
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
     cur = conn.cursor()
     cur.execute("""
         SELECT id, category, text, price_min, price_max, property_type,
                property_area_min, property_area_max, property_address,
-               property_rooms_min, property_rooms_max, created_at
-        FROM requests WHERE tg_id = ? ORDER BY created_at DESC
+               property_rooms_min, property_rooms_max, created_at, status, mcp_listing_id
+        FROM requests WHERE tg_id = ? AND (status IS NULL OR status = 'active') ORDER BY id DESC
     """, (tg_id,))
     rows = cur.fetchall()
     conn.close()
     return rows
+
+def soft_delete_request(req_id, tg_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE requests SET status = 'deleted_pending'
+        WHERE id = ? AND tg_id = ? AND (status IS NULL OR status = 'active')
+    """, (req_id, tg_id))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
 
 def delete_request(req_id, tg_id):
     conn = sqlite3.connect(DB_PATH)

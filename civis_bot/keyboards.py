@@ -8,6 +8,88 @@ from telebot.types import (
     ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton
 )
+import time
+import threading
+from collections import OrderedDict
+
+
+class BoundedClickTracker:
+    """Thread-safe bounded in-memory sliding window click tracker."""
+    def __init__(self, max_size: int = 1000, window_seconds: float = 1.0):
+        self._max_size = max_size
+        self._window_seconds = window_seconds
+        self._clicks = OrderedDict()  # (user_id, action_prefix) -> timestamp
+        self._lock = threading.Lock()
+
+    def is_throttled(self, user_id: int, action: str) -> bool:
+        now = time.time()
+        key = (user_id, action)
+        with self._lock:
+            if len(self._clicks) > self._max_size:
+                cutoff = now - (self._window_seconds * 10)
+                old_keys = [k for k, ts in self._clicks.items() if ts < cutoff]
+                for k in old_keys:
+                    del self._clicks[k]
+                if len(self._clicks) > self._max_size:
+                    self._clicks.popitem(last=False)
+
+            last_ts = self._clicks.get(key)
+            if last_ts and (now - last_ts) < self._window_seconds:
+                return True
+            self._clicks[key] = now
+            return False
+
+    def clear(self):
+        with self._lock:
+            self._clicks.clear()
+
+
+CLICK_TRACKER = BoundedClickTracker()
+
+
+def get_empty_items_keyboard(prefix: str, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Keyboard for empty offers/requests list."""
+    markup = InlineKeyboardMarkup()
+    act_cb = "act:offer" if prefix == "o" else "act:request"
+    act_label = "➕ Создать предложение" if prefix == "o" else "➕ Создать запрос"
+    markup.row(
+        InlineKeyboardButton(act_label, callback_data=act_cb),
+        InlineKeyboardButton("🏬 Маркетплейс", callback_data="hub:mkt")
+    )
+    return markup
+
+
+def get_item_card_keyboard(prefix: str, item_id: int, current_page: int, total_pages: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Keyboard for single item view with pagination (1 item per page)."""
+    markup = InlineKeyboardMarkup()
+    prev_cb = f"pg:{prefix}:{current_page - 1}" if current_page > 1 else "noop"
+    next_cb = f"pg:{prefix}:{current_page + 1}" if current_page < total_pages else "noop"
+    markup.row(
+        InlineKeyboardButton("◀", callback_data=prev_cb),
+        InlineKeyboardButton(f"[ {current_page} / {total_pages} ]", callback_data="noop"),
+        InlineKeyboardButton("▶", callback_data=next_cb)
+    )
+    markup.row(
+        InlineKeyboardButton("🗑 Удалить", callback_data=f"ask_del:{prefix}:{item_id}:{current_page}")
+    )
+    act_cb = "act:offer" if prefix == "o" else "act:request"
+    act_label = "➕ Создать" if prefix == "o" else "➕ Создать"
+    markup.row(
+        InlineKeyboardButton(act_label, callback_data=act_cb),
+        InlineKeyboardButton("🏬 Маркетплейс", callback_data="hub:mkt")
+    )
+    return markup
+
+
+def get_delete_confirm_keyboard(prefix: str, item_id: int, current_page: int, lang: str = "ru") -> InlineKeyboardMarkup:
+    """Confirmation dialog keyboard for deleting an item."""
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("✅ Да, удалить", callback_data=f"cfm_del:{prefix}:{item_id}:{current_page}"),
+        InlineKeyboardButton("❌ Отмена", callback_data=f"cxl_del:{prefix}:{item_id}:{current_page}")
+    )
+    return markup
+
 
 def get_language_keyboard():
     """Language selection - 2 columns"""

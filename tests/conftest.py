@@ -233,6 +233,7 @@ class TelegramTestDriver:
                     "date": int(time.time()),
                     "text": "menu"
                 },
+                "chat_instance": f"ci_{tg_id}",
                 "data": callback_data
             }
         }
@@ -445,7 +446,12 @@ def publish_mock(monkeypatch):
         def __call__(self, key, payload):
             self.calls.append((key, payload))
             if self.side_effect:
-                return self.side_effect(key, payload)
+                if isinstance(self.side_effect, BaseException):
+                    raise self.side_effect
+                if isinstance(self.side_effect, type) and issubclass(self.side_effect, BaseException):
+                    raise self.side_effect()
+                if callable(self.side_effect):
+                    return self.side_effect(key, payload)
             return self.result
 
     mock = PublishMock()
