@@ -215,7 +215,6 @@ if __name__ == "__main__":
         logger.info("MCP tables initialized")
 
         start_periodic_sync_scanner(interval_seconds=30.0)
-        logger.info("Marketplace sync scanner started (30s interval)")
         
         set_commands_menu()
         

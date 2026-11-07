@@ -558,6 +558,7 @@ def start_periodic_sync_scanner(interval_seconds: float = 30.0):
 
     _scanner_thread = threading.Thread(target=_scanner_loop, daemon=True, name="sync_scanner")
     _scanner_thread.start()
+    logger.info(f"Periodic MCP sync scanner started (interval={interval_seconds}s)")
 
 
 def stop_periodic_sync_scanner(timeout: float = 2.0):
@@ -567,5 +568,6 @@ def stop_periodic_sync_scanner(timeout: float = 2.0):
         _scanner_stop_event.set()
     if _scanner_thread and _scanner_thread.is_alive():
         _scanner_thread.join(timeout=timeout)
+        logger.info("Periodic MCP sync scanner stopped")
 
 
