@@ -75,6 +75,11 @@ def test_marketplace_catalog_default_page_1_shows_5_active_offers(bot_session):
     card_callbacks = [c for c in callbacks if c.startswith("mkt:v:")]
     assert len(card_callbacks) == 5
 
+    # UX-1: [🔙 В меню] must NOT be present in catalog view (navigation is self-contained)
+    assert "hub:mkt" not in callbacks
+    button_texts = [b.text for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "text", None)]
+    assert not any("В меню" in t for t in button_texts)
+
 
 # ---------------------------------------------------------------------------
 # Test 1b: Opens catalog from IDLE state via callback
@@ -208,6 +213,9 @@ def test_marketplace_categories_menu(bot_session):
     driver.click_button(tg_id, "mkt:cats")
 
     callbacks = [b.callback_data for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "callback_data", None)]
+    # UX-2: Exactly 11 category choices (10 slugs + 1 'all' without duplication)
+    assert len(callbacks) == 11
+    assert callbacks.count("mkt:cat:all:1") == 1
     assert "mkt:cat:all:1" in callbacks
     assert "mkt:cat:services:1" in callbacks
     assert "mkt:cat:business:1" in callbacks
@@ -302,6 +310,8 @@ def test_marketplace_card_detail_view_renders_correctly(bot_session):
     assert "Super Gaming Laptop" in last_text
     assert "RTX 4090" in last_text
     assert "250000" in last_text
+    # UX-3: Title is not duplicated in card body
+    assert last_text.count("Super Gaming Laptop") == 1
 
     # Author URL button
     urls = [b.url for row in recorder.records[-1].reply_markup.keyboard for b in row if getattr(b, "url", None)]
@@ -460,6 +470,10 @@ def test_marketplace_dispatcher_routing(bot_session, cb_template, setup_state):
     # Must NOT be intercepted by legacy catch-all toast
     answered = get_answered_callbacks(recorder)
     assert not any("unknown action" in (a.get("text") or "").lower() for a in answered)
+    for a in answered:
+        toast_text = a.get("text") or ""
+        assert "Unknown action" not in toast_text
+        assert "unknown action" not in toast_text.lower()
     assert any(r.method == "edit_message_text" for r in recorder.records)
 
     # In confirm cases, session must end up cleared to IDLE

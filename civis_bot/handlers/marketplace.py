@@ -364,8 +364,7 @@ def render_marketplace_catalog(
     )
 
     markup.row(
-        InlineKeyboardButton("📂 Категории", callback_data="mkt:cats"),
-        InlineKeyboardButton("🔙 В меню", callback_data="hub:mkt")
+        InlineKeyboardButton("📂 Категории", callback_data="mkt:cats")
     )
 
     if message_id:
@@ -391,8 +390,6 @@ def render_categories_menu(chat_id: int, message_id: Optional[int] = None):
             s2 = slugs[i + 1]
             row_btns.append(InlineKeyboardButton(CATEGORY_LABELS.get(s2, s2), callback_data=f"mkt:cat:{s2}:1"))
         markup.row(*row_btns)
-
-    markup.row(InlineKeyboardButton("🔙 В каталог", callback_data="mkt:cat:all:1"))
 
     if message_id:
         safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
@@ -455,7 +452,6 @@ def render_marketplace_card(
         contact_note = "\n<i>(Автор не указал публичный контакт)</i>\n"
 
     card_text = (
-        f"📌 <b>{escaped_title}</b>\n\n"
         f"<b>Категория:</b> {html.escape(category_label)}\n"
         f"{price_text}\n"
         f"{escaped_desc}{overflow_note}\n"
@@ -688,10 +684,10 @@ def handle_marketplace_callbacks(call: CallbackQuery):
         )
         return
 
-    # Fallback logging and alert for unhandled callback data
+    # Fallback logging and silent answer for unhandled callback data
     logger.warning(f"Unhandled callback_data received: '{data}' from tg_id={tg_id}")
     try:
-        bot.answer_callback_query(call.id, "Unknown action")
+        bot.answer_callback_query(call.id)
     except Exception as e:
         logger.warning(f"answer_callback_query failed for {call.id}: {e}")
 
