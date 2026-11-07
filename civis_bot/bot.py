@@ -19,6 +19,7 @@ from telebot.types import BotCommand, CallbackQuery
 from config import TOKEN, get_proxy_url
 from database import init_db
 from handlers import register_handlers, set_bot
+from mcp_client import ensure_mcp_tables, start_periodic_sync_scanner, stop_periodic_sync_scanner
 
 # Disable SSL warnings for testing
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -50,6 +51,7 @@ def signal_handler(sig, frame):
         os._exit(0)
     
     shutting_down = True
+    stop_periodic_sync_scanner(timeout=1.0)
     print("\n" + "="*50)
     print("Shutting down bot...")
     print("Press Ctrl+C again to force exit immediately.")
@@ -80,42 +82,37 @@ else:
 # --- SET BOT FOR HANDLERS ---
 set_bot(bot)
 
-# --- CALLBACK QUERY HANDLER (for inline keyboard) ---
-@bot.callback_query_handler(func=lambda call: True)
+# --- LEGACY CALLBACK QUERY HANDLER (for quick menu strings) ---
+COMMAND_MAP = {
+    'offer': '/offer',
+    'request': '/request',
+    'my_offers': '/my_offers',
+    'my_requests': '/my_requests',
+    'delete_offer': '/delete_offer',
+    'delete_request': '/delete_request',
+    'marketplace': '/marketplace',
+    'profile': '/profile',
+    'embedding': '/embedding',
+    'citizens': '/citizens',
+    'subscribe': '/subscribe',
+    'match': '/match',
+    'search': '/search',
+    'help': '/help',
+    'support': '/support',
+    'language': '/language',
+    'start': '/start',
+    'menu': '/menu',
+    'offer_real_estate': '/offer_real_estate',
+    'offer_taxi': '/offer_taxi',
+    'offer_delivery': '/offer_delivery',
+}
+
+@bot.callback_query_handler(func=lambda call: call.data in COMMAND_MAP)
 def handle_callback(call: CallbackQuery):
-    """Handle inline keyboard button clicks — execute command immediately"""
+    """Handle legacy inline keyboard button clicks — execute command immediately"""
     data = call.data
-    
-    command_map = {
-        'offer': '/offer',
-        'request': '/request',
-        'my_offers': '/my_offers',
-        'my_requests': '/my_requests',
-        'delete_offer': '/delete_offer',
-        'delete_request': '/delete_request',
-        'marketplace': '/marketplace',
-        'profile': '/profile',
-        'embedding': '/embedding',
-        'citizens': '/citizens',
-        'subscribe': '/subscribe',
-        'match': '/match',
-        'search': '/search',
-        'help': '/help',
-        'support': '/support',
-        'language': '/language',
-        'start': '/start',
-        'menu': '/menu',
-        'offer_real_estate': '/offer_real_estate',
-        'offer_taxi': '/offer_taxi',
-        'offer_delivery': '/offer_delivery',
-    }
-    
-    if data not in command_map:
-        bot.answer_callback_query(call.id, "Unknown action")
-        return
-    
     bot.answer_callback_query(call.id)
-    cmd = command_map[data]
+    cmd = COMMAND_MAP[data]
     original_msg_id = call.message.message_id
     
     class FakeMessage:
@@ -214,6 +211,12 @@ if __name__ == "__main__":
         init_db()
         logger.info("Database initialized")
         
+        ensure_mcp_tables()
+        logger.info("MCP tables initialized")
+
+        start_periodic_sync_scanner(interval_seconds=30.0)
+        logger.info("Marketplace sync scanner started (30s interval)")
+        
         set_commands_menu()
         
         logger.info("Checking connection to Telegram API...")
@@ -242,6 +245,7 @@ if __name__ == "__main__":
         except:
             pass
         
+        stop_periodic_sync_scanner(timeout=2.0)
         logger.info("Bot stopped.")
         sys.exit(0)
         

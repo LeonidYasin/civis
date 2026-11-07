@@ -6,23 +6,28 @@ Contains: offer, request, my_offers, my_requests, delete_offer, delete_request, 
 
 import logging
 import sqlite3
+import html
+from typing import Optional
 
-from telebot.types import Message, ReplyKeyboardRemove
+from telebot.types import Message, ReplyKeyboardRemove, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from database import (
     get_user, get_session, set_session, clear_session,
     get_all_offers, get_all_requests,
     get_my_offers, get_my_requests,
     save_offer, save_request, delete_offer, delete_request,
+    soft_delete_offer, soft_delete_request,
     DB_PATH
 )
 from locales import TEXTS
 from keyboards import (
-    get_main_keyboard, get_category_keyboard
+    get_main_keyboard, get_category_keyboard,
+    CLICK_TRACKER, get_empty_items_keyboard, get_item_card_keyboard, get_delete_confirm_keyboard
 )
 from utils import get_text
+import mcp_client
 
-from .helpers import log_message, bot
+from .helpers import log_message, bot, safe_edit_message
 
 logger = logging.getLogger(__name__)
 
@@ -117,43 +122,257 @@ def cmd_request(message: Message):
         reply_markup=get_category_keyboard(lang)
     )
 
+def render_my_items_screen(chat_id: int, tg_id: int, entity_type: str = "offer", requested_page: int = 1, message_id: Optional[int] = None, user_lang: str = "ru"):
+    """
+    Renders/edits paginated single-item screen for my_offers or my_requests.
+    """
+    is_offer = (entity_type == "offer")
+    prefix = "o" if is_offer else "r"
+    items = get_my_offers(tg_id) if is_offer else get_my_requests(tg_id)
+    total_items = len(items)
+
+    if total_items == 0:
+        if is_offer:
+            text = "У вас пока нет активных предложений (empty)."
+        else:
+            text = "У вас пока нет активных запросов (empty)."
+        markup = get_empty_items_keyboard(prefix, user_lang)
+        if message_id:
+            safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+        else:
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+        return
+
+    total_pages = total_items
+    current_page = max(1, min(requested_page, total_pages))
+    item = items[current_page - 1]
+
+    item_id = item[0]
+    category = item[1] or "general"
+    item_text = item[2] or ""
+    created_at = item[8] if len(item) > 8 and item[8] else ""
+    created_str = str(created_at)[:10] if created_at else ""
+
+    escaped_text = html.escape(item_text)
+    escaped_cat = html.escape(category)
+
+    if is_offer:
+        header = f"📦 <b>Ваше предложение [ {current_page} / {total_pages} ]</b>"
+    else:
+        header = f"📥 <b>Ваш запрос [ {current_page} / {total_pages} ]</b>"
+
+    text = (
+        f"{header}\n\n"
+        f"<b>Категория:</b> {escaped_cat}\n"
+        f"{escaped_text}\n\n"
+        f"<i>ID: {item_id} | Создано: {created_str}</i>"
+    )
+
+    markup = get_item_card_keyboard(prefix, item_id, current_page, total_pages, user_lang)
+    if message_id:
+        safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+    else:
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+
+
+def render_delete_confirm_screen(chat_id: int, message_id: int, entity_type: str, item_id: int, page: int, user_lang: str = "ru"):
+    """Renders confirmation card for delete action."""
+    prefix = "o" if entity_type == "offer" else "r"
+    name = "предложение" if entity_type == "offer" else "запрос"
+    text = (
+        f"⚠️ <b>Подтверждение удаления</b>\n\n"
+        f"Вы действительно хотите отозвать и удалить это {name} (ID #{item_id})?"
+    )
+    markup = get_delete_confirm_keyboard(prefix, item_id, page, user_lang)
+    safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+
+
+def handle_confirm_delete(chat_id: int, message_id: int, tg_id: int, entity_type: str, item_id: int, page: int, callback_query_id: str, user_lang: str = "ru"):
+    """Processes confirmed deletion: marks deleted_pending locally and queues MCP revocation."""
+    is_offer = (entity_type == "offer")
+    deleted = soft_delete_offer(item_id, tg_id) if is_offer else soft_delete_request(item_id, tg_id)
+    if not deleted:
+        try:
+            bot.answer_callback_query(callback_query_id, text="Это объявление уже удалено.", show_alert=False)
+        except Exception:
+            pass
+        render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id, user_lang=user_lang)
+        return
+
+    payload = {"action": "revoke_listing", "id": item_id}
+    mcp_client.trigger_background_sync(tg_id, entity_type, item_id, payload, action="revoke_listing")
+
+    try:
+        bot.answer_callback_query(callback_query_id, text="Объявление удалено.")
+    except Exception:
+        pass
+
+    render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id, user_lang=user_lang)
+
+
+def render_marketplace_hub(chat_id: int, message_id: Optional[int] = None):
+    """Renders marketplace hub escape hatch view."""
+    text = (
+        "🛒 <b>Маркетплейс Civis</b>\n\n"
+        "Здесь вы можете управлять своими предложениями и запросами, а также находить совпадения через Marketplace OS."
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("📦 Мои предложения", callback_data="pg:o:1"),
+        InlineKeyboardButton("📥 Мои запросы", callback_data="pg:r:1")
+    )
+    markup.row(
+        InlineKeyboardButton("➕ Создать оффер", callback_data="act:offer"),
+        InlineKeyboardButton("➕ Создать запрос", callback_data="act:request")
+    )
+    if message_id:
+        safe_edit_message(bot, chat_id, message_id, text, reply_markup=markup, parse_mode='HTML')
+    else:
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode='HTML')
+
+
+def handle_marketplace_callbacks(call: CallbackQuery):
+    """Unified callback query handler for marketplace pagination, deletion and navigation."""
+    tg_id = call.from_user.id
+    data = call.data or ""
+    chat_id = call.message.chat.id if call.message and call.message.chat else tg_id
+    message_id = call.message.message_id if call.message else None
+
+    # 1. Anti-flood click throttle check
+    action_key = data.split(":")[0] if ":" in data else data
+    if CLICK_TRACKER.is_throttled(tg_id, action_key):
+        try:
+            bot.answer_callback_query(call.id, text="Слишком частые клики, подождите...")
+        except Exception:
+            pass
+        return
+
+    # 2. FSM Policy check
+    state, session_data = get_session(tg_id)
+    is_fsm_active = (state is not None and state != "IDLE")
+
+    if is_fsm_active:
+        if data == "noop":
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception:
+                pass
+            return
+        elif data.startswith("cxl_del:"):
+            pass  # Allowed without clearing session
+        elif data == "hub:mkt" or data.startswith("hub:"):
+            # Escape hatch: clear session to IDLE and proceed
+            clear_session(tg_id)
+        elif data in ["act:offer", "act:request"] and state in ["offer_category", "request_category"]:
+            # Allowed to switch category selection
+            pass
+        else:
+            try:
+                bot.answer_callback_query(call.id, text="Пожалуйста, сначала завершите текущее действие.", show_alert=True)
+            except Exception:
+                pass
+            return
+
+    # 3. Handle data
+    if data == "noop":
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+        return
+
+    if data.startswith("pg:"):
+        parts = data.split(":")
+        if len(parts) >= 3:
+            entity_type = "offer" if parts[1] == "o" else "request"
+            page = int(parts[2])
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception:
+                pass
+            render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id)
+        return
+
+    if data.startswith("ask_del:"):
+        parts = data.split(":")
+        if len(parts) >= 4:
+            entity_type = "offer" if parts[1] == "o" else "request"
+            item_id = int(parts[2])
+            page = int(parts[3])
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception:
+                pass
+            render_delete_confirm_screen(chat_id, message_id, entity_type, item_id, page)
+        return
+
+    if data.startswith("cxl_del:"):
+        parts = data.split(":")
+        if len(parts) >= 4:
+            entity_type = "offer" if parts[1] == "o" else "request"
+            page = int(parts[3])
+            try:
+                bot.answer_callback_query(call.id)
+            except Exception:
+                pass
+            render_my_items_screen(chat_id, tg_id, entity_type=entity_type, requested_page=page, message_id=message_id)
+        return
+
+    if data.startswith("cfm_del:"):
+        parts = data.split(":")
+        if len(parts) >= 4:
+            entity_type = "offer" if parts[1] == "o" else "request"
+            item_id = int(parts[2])
+            page = int(parts[3])
+            handle_confirm_delete(chat_id, message_id, tg_id, entity_type, item_id, page, call.id)
+        return
+
+    if data == "act:offer":
+        set_session(tg_id, 'offer_category', {'language': 'ru'})
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+        bot.send_message(
+            chat_id,
+            "Select the category for your offer:\n\nChoose from the buttons below:",
+            reply_markup=get_category_keyboard('ru')
+        )
+        return
+
+    if data == "act:request":
+        set_session(tg_id, 'request_category', {'language': 'ru'})
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+        bot.send_message(
+            chat_id,
+            "Select the category for your request:\n\nChoose from the buttons below:",
+            reply_markup=get_category_keyboard('ru')
+        )
+        return
+
+    if data == "hub:mkt":
+        try:
+            bot.answer_callback_query(call.id)
+        except Exception:
+            pass
+        render_marketplace_hub(chat_id, message_id)
+        return
+
+
 def cmd_my_offers(message: Message):
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
-    rows = get_my_offers(tg_id)
-    if not rows:
-        bot.reply_to(message, "You have no offers yet.")
-        return
-    
-    text = "📦 Your Offers:\n\n"
-    for row in rows:
-        if len(row) >= 4:
-            id, category, offer_text, created_at = row[:4]
-        else:
-            id, offer_text, created_at = row
-            category = 'general'
-        text += f"ID {id} [{category}]: {offer_text}\n"
-        text += f"To delete: /delete_offer {id}\n\n"
-    bot.reply_to(message, text)
+    render_my_items_screen(message.chat.id, tg_id, entity_type="offer", requested_page=1, message_id=None)
+
 
 def cmd_my_requests(message: Message):
     log_message(message, "[CMD]")
     tg_id = message.from_user.id
-    rows = get_my_requests(tg_id)
-    if not rows:
-        bot.reply_to(message, "You have no requests yet.")
-        return
-    
-    text = "📥 Your Requests:\n\n"
-    for row in rows:
-        if len(row) >= 4:
-            id, category, req_text, created_at = row[:4]
-        else:
-            id, req_text, created_at = row
-            category = 'general'
-        text += f"ID {id} [{category}]: {req_text}\n"
-        text += f"To delete: /delete_request {id}\n\n"
-    bot.reply_to(message, text)
+    render_my_items_screen(message.chat.id, tg_id, entity_type="request", requested_page=1, message_id=None)
+
 
 def cmd_delete_offer(message: Message):
     log_message(message, "[CMD]")

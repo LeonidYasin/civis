@@ -21,7 +21,8 @@ from .marketplace import (
     cmd_offer, cmd_request, cmd_my_offers, cmd_my_requests,
     cmd_delete_offer, cmd_delete_request, cmd_marketplace,
     cmd_offers, cmd_requests,
-    cmd_offer_real_estate, cmd_offer_taxi, cmd_offer_delivery
+    cmd_offer_real_estate, cmd_offer_taxi, cmd_offer_delivery,
+    handle_marketplace_callbacks
 )
 from .dialogs import (
     cmd_upload_dialog, cmd_my_dialogs, cmd_delete_dialog,
@@ -101,6 +102,9 @@ def register_handlers():
     
     # Survey state handler (catch-all for text messages)
     bot.message_handler(func=lambda m: True, content_types=['text'])(handle_survey)
+
+    # Marketplace inline callback handler
+    bot.callback_query_handler(func=lambda call: True)(handle_marketplace_callbacks)
     
     logger.info("All handlers registered")
 
