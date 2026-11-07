@@ -282,7 +282,6 @@ def enqueue_sync(tg_id: int, entity_type: str, entity_id: int, payload: Dict[str
     """
     Saves an outgoing item into the pending_marketplace_sync table for resilient dual-write.
     """
-    ensure_mcp_tables()
     conn = get_db_connection()
     cur = conn.cursor()
     now_iso = datetime.now().isoformat()
@@ -535,6 +534,12 @@ def process_all_pending_syncs(max_items: int = 10) -> int:
     return success_count
 
 
+def is_scanner_alive() -> bool:
+    """Returns True if the background scanner thread is active and running."""
+    global _scanner_thread
+    return bool(_scanner_thread and _scanner_thread.is_alive())
+
+
 def start_periodic_sync_scanner(interval_seconds: float = 30.0):
     """Starts background scanner thread checking pending retries."""
     global _scanner_thread, _scanner_stop_event
@@ -543,11 +548,13 @@ def start_periodic_sync_scanner(interval_seconds: float = 30.0):
     _scanner_stop_event.clear()
 
     def _scanner_loop():
-        while not _scanner_stop_event.wait(interval_seconds):
+        while not _scanner_stop_event.is_set():
             try:
+                if _scanner_stop_event.wait(interval_seconds):
+                    break
                 process_all_pending_syncs()
             except Exception as e:
-                logger.warning(f"Error in periodic sync scanner: {e}")
+                logger.exception(f"Unexpected error in periodic sync scanner loop: {e}")
 
     _scanner_thread = threading.Thread(target=_scanner_loop, daemon=True, name="sync_scanner")
     _scanner_thread.start()
@@ -560,4 +567,5 @@ def stop_periodic_sync_scanner(timeout: float = 2.0):
         _scanner_stop_event.set()
     if _scanner_thread and _scanner_thread.is_alive():
         _scanner_thread.join(timeout=timeout)
+
 

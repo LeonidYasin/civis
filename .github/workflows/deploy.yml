@@ -73,12 +73,14 @@ jobs:
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
 
-            # Backup critical local data before repository update
+            # Backup critical local data before repository update with WAL-safe checkpoint and rotation
             if [ -f "civis_bot/.env" ]; then
               cp "civis_bot/.env" "civis_bot/.env.bak" 2>/dev/null || true
             fi
             if [ -f "civis_bot/civis_data.db" ]; then
-              cp "civis_bot/civis_data.db" "civis_bot/civis_data.db.bak" 2>/dev/null || true
+              python3 -c "import sqlite3; conn = sqlite3.connect('civis_bot/civis_data.db'); conn.execute('PRAGMA wal_checkpoint(TRUNCATE);'); conn.close()" 2>/dev/null || sqlite3 civis_bot/civis_data.db "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
+              cp "civis_bot/civis_data.db" "civis_bot/civis_data.db.bak.$(date +%s)" 2>/dev/null || true
+              ls -1t civis_bot/civis_data.db.bak.* 2>/dev/null | tail -n +6 | xargs -r rm 2>/dev/null || true
             fi
 
             # 1. Clone or update repository
@@ -95,8 +97,11 @@ jobs:
             fi
 
             # Restore local database if needed
-            if [ ! -f "civis_bot/civis_data.db" ] && [ -f "civis_bot/civis_data.db.bak" ]; then
-              cp "civis_bot/civis_data.db.bak" "civis_bot/civis_data.db"
+            if [ ! -f "civis_bot/civis_data.db" ]; then
+              LATEST_BAK=$(ls -1t civis_bot/civis_data.db.bak* 2>/dev/null | head -n 1 || true)
+              if [ -n "$LATEST_BAK" ]; then
+                cp "$LATEST_BAK" "civis_bot/civis_data.db"
+              fi
             fi
             if [ ! -f "civis_bot/.env" ] && [ -f "civis_bot/.env.bak" ]; then
               cp "civis_bot/.env.bak" "civis_bot/.env"
