@@ -8,6 +8,7 @@ import sqlite3
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -734,3 +735,88 @@ def get_matches_remaining(tg_id):
         return float('inf')
     
     return max(0, sub['matches_limit'] - sub['matches_used'])
+
+
+# --- MARKETPLACE CATALOG FUNCTIONS ---
+
+def get_catalog_page(category_slugs: Optional[list] = None, limit: int = 5, offset: int = 0):
+    """
+    Returns paginated active offers joined with users to fetch author username.
+    Protects privacy: returns only required public projection fields.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    if category_slugs:
+        placeholders = ",".join("?" for _ in category_slugs)
+        query = f"""
+            SELECT o.id, o.tg_id, o.category, o.text, o.price, o.created_at, o.status, u.username
+            FROM offers o
+            LEFT JOIN users u ON u.tg_id = o.tg_id
+            WHERE (o.status = 'active' OR o.status IS NULL) AND o.category IN ({placeholders})
+            ORDER BY o.id DESC
+            LIMIT ? OFFSET ?
+        """
+        cur.execute(query, (*category_slugs, limit, offset))
+    else:
+        query = """
+            SELECT o.id, o.tg_id, o.category, o.text, o.price, o.created_at, o.status, u.username
+            FROM offers o
+            LEFT JOIN users u ON u.tg_id = o.tg_id
+            WHERE (o.status = 'active' OR o.status IS NULL)
+            ORDER BY o.id DESC
+            LIMIT ? OFFSET ?
+        """
+        cur.execute(query, (limit, offset))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def get_catalog_count(category_slugs: Optional[list] = None) -> int:
+    """
+    Returns count of active offers matching optional category filter.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    cur = conn.cursor()
+    if category_slugs:
+        placeholders = ",".join("?" for _ in category_slugs)
+        query = f"""
+            SELECT COUNT(*)
+            FROM offers
+            WHERE (status = 'active' OR status IS NULL) AND category IN ({placeholders})
+        """
+        cur.execute(query, tuple(category_slugs))
+    else:
+        query = """
+            SELECT COUNT(*)
+            FROM offers
+            WHERE (status = 'active' OR status IS NULL)
+        """
+        cur.execute(query)
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+
+def get_offer_with_author(offer_id: int):
+    """
+    Fetches a single active offer by id joined with author username.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    query = """
+        SELECT o.id, o.tg_id, o.category, o.text, o.price, o.created_at, o.status, u.username
+        FROM offers o
+        LEFT JOIN users u ON u.tg_id = o.tg_id
+        WHERE o.id = ? AND (o.status = 'active' OR o.status IS NULL)
+    """
+    cur.execute(query, (offer_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row
+

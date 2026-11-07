@@ -21,8 +21,9 @@ class BoundedClickTracker:
         self._clicks = OrderedDict()  # (user_id, action_prefix) -> timestamp
         self._lock = threading.Lock()
 
-    def is_throttled(self, user_id: int, action: str) -> bool:
+    def is_throttled(self, user_id: int, action: str, custom_window: float = None) -> bool:
         now = time.time()
+        window = custom_window if custom_window is not None else self._window_seconds
         key = (user_id, action)
         with self._lock:
             if len(self._clicks) > self._max_size:
@@ -34,7 +35,7 @@ class BoundedClickTracker:
                     self._clicks.popitem(last=False)
 
             last_ts = self._clicks.get(key)
-            if last_ts and (now - last_ts) < self._window_seconds:
+            if last_ts and (now - last_ts) < window:
                 return True
             self._clicks[key] = now
             return False

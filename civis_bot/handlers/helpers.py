@@ -4,7 +4,9 @@ Helper functions for handlers.
 """
 
 import time
+import re
 import logging
+from typing import Optional
 from telebot.types import Message
 from telebot.apihelper import ApiTelegramException
 
@@ -89,4 +91,41 @@ def safe_edit_message(bot_inst, chat_id, message_id, text, reply_markup=None, pa
             logger.warning(f"Unexpected error in safe_edit_message: {e}")
             return False
     return False
+
+
+# --- USERNAME AND TITLE UTILITIES ---
+
+_TG_USERNAME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_]{4,31}$')
+
+
+def normalize_username(raw: Optional[str]) -> Optional[str]:
+    """
+    Validates and normalizes Telegram username:
+    - Strips leading '@' and whitespace.
+    - Strict regex: 5..32 chars, starts with latin letter, latin+digits+underscore.
+    - Returns cleaned string or None.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    cleaned = raw.strip().lstrip('@')
+    if _TG_USERNAME_RE.match(cleaned):
+        return cleaned
+    return None
+
+
+def extract_title(text: Optional[str]) -> str:
+    """
+    Extracts first non-empty line as raw title, truncated to max 50 chars (47 + '...').
+    Does NOT HTML-escape; presentation layer escapes at render time.
+    Fallback: 'Объявление Civis' if empty or None.
+    """
+    if not text or not isinstance(text, str) or not text.strip():
+        return "Объявление Civis"
+    first_line = text.strip().split("\n")[0].strip()
+    if not first_line:
+        return "Объявление Civis"
+    if len(first_line) > 50:
+        return first_line[:47] + "..."
+    return first_line
+
 
