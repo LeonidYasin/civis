@@ -604,6 +604,10 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "hub:mkt")
 
+    # Verify callback is answered (no spinning button in UI)
+    answered_1 = get_answered_callbacks(recorder)
+    assert len(answered_1) >= 1
+
     # Should ask confirmation
     last_text = (recorder.last_text or "").lower()
     assert "несохран" in last_text or "прервать" in last_text or "черновик" in last_text
@@ -623,6 +627,10 @@ def test_hub_mkt_fsm_confirmation_and_cancel(bot_session):
     driver.click_button(tg_id, "hub:mkt:confirm")
     state, _ = database.get_session(tg_id)
     assert state is None or state == "IDLE"
+
+    # Verify confirm callback is answered
+    answered_3 = get_answered_callbacks(recorder)
+    assert len(answered_3) >= 2
 
 
 # ---------------------------------------------------------------------------
