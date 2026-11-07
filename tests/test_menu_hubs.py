@@ -341,13 +341,13 @@ def test_hub_cooldown_throttles_rapid_clicks(bot_session):
     # Click 1: renders view
     driver.click_button(tg_id, "hub:prf")
     edits_count_1 = sum(1 for r in recorder.records if r.method in ("edit_message_text", "send_message"))
-    assert edits_count_1 == 1
+    assert edits_count_1 == 1, "handler must render view on first click"
 
     # Click 2: immediately (without clear!) -> throttled
     driver.click_button(tg_id, "hub:prf")
     edits_count_2 = sum(1 for r in recorder.records if r.method in ("edit_message_text", "send_message"))
     # Edit count must remain 1
-    assert edits_count_2 == 1
+    assert edits_count_2 == 1, "second click within cooldown window must be throttled without another edit"
 
     # Throttling toast answer returned
     toast_answers = [r for r in recorder.records if r.method == "answer_callback_query" and r.text]
@@ -715,9 +715,8 @@ def test_match_run_double_click_is_ignored(bot_session, deferred_match_pool):
     CLICK_TRACKER.clear()
     driver.click_button(tg_id, "act:match:run")
 
+    assert hubs_mod and tg_id in getattr(hubs_mod, "_MATCH_IN_PROGRESS", set()), "handler must set lock on first click"
     assert len(deferred_match_pool.tasks) == 1
-    if hubs_mod and hasattr(hubs_mod, "_MATCH_IN_PROGRESS"):
-        assert tg_id in hubs_mod._MATCH_IN_PROGRESS
 
     # Clearing cooldown between clicks to exercise _MATCH_IN_PROGRESS lock specifically
     CLICK_TRACKER.clear()
