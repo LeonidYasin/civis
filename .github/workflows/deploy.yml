@@ -79,7 +79,8 @@ jobs:
             fi
             if [ -f "civis_bot/civis_data.db" ]; then
               python3 -c "import sqlite3; conn = sqlite3.connect('civis_bot/civis_data.db'); conn.execute('PRAGMA wal_checkpoint(TRUNCATE);'); conn.close()" 2>/dev/null || sqlite3 civis_bot/civis_data.db "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
-              cp "civis_bot/civis_data.db" "civis_bot/civis_data.db.bak.$(date +%s)" 2>/dev/null || true
+              BAK_FILE="civis_bot/civis_data.db.bak.$(date +%s)"
+              (python3 -c "import sqlite3; src=sqlite3.connect('civis_bot/civis_data.db'); dst=sqlite3.connect('$BAK_FILE'); src.backup(dst); dst.close(); src.close()" 2>/dev/null || cp "civis_bot/civis_data.db" "$BAK_FILE") || { echo "❌ BACKUP FAILED"; exit 1; }
               ls -1t civis_bot/civis_data.db.bak.* 2>/dev/null | tail -n +6 | xargs -r rm 2>/dev/null || true
             fi
 
