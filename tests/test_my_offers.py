@@ -466,12 +466,12 @@ def test_act_callbacks_transition_fsm(bot_session):
 
 
 def test_hub_callback_opens_marketplace(bot_session):
-    """hub:mkt clears session (escape hatch) and renders marketplace view with markup."""
+    """hub:mkt in IDLE state directly renders marketplace view with markup."""
     driver, recorder, _, _ = bot_session
     tg_id = 777001
     seed_user(tg_id)
 
-    database.set_session(tg_id, "survey_name", {})
+    database.set_session(tg_id, None, {})
 
     recorder.clear()
     CLICK_TRACKER.clear()
