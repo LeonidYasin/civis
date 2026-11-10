@@ -364,7 +364,8 @@ def render_marketplace_catalog(
     )
 
     markup.row(
-        InlineKeyboardButton("📂 Категории", callback_data="mkt:cats")
+        InlineKeyboardButton("📂 Категории", callback_data="mkt:cats"),
+        InlineKeyboardButton("🏠 Главное меню", callback_data="hub:main")
     )
 
     if message_id:

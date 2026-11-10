@@ -707,6 +707,9 @@ def update_subscription_plan(tg_id, plan, matches_limit=None):
     conn.close()
 
 def increment_matches_used(tg_id):
+    sub = get_subscription(tg_id)
+    if not sub:
+        create_subscription(tg_id)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("UPDATE subscriptions SET matches_used = matches_used + 1, updated_at = ? WHERE tg_id = ?",
@@ -819,4 +822,55 @@ def get_offer_with_author(offer_id: int):
     row = cur.fetchone()
     conn.close()
     return row
+
+
+def reset_user_profile(tg_id: int):
+    """
+    Clear user profile fields, keeping tg_id, language, and username.
+    Sets status to 'registered'.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    now = datetime.now().isoformat()
+    cur.execute("""
+        UPDATE users
+        SET name = NULL, about_text = NULL, user_values = NULL, role = NULL, format = NULL, status = 'registered', updated_at = ?
+        WHERE tg_id = ?
+    """, (now, tg_id))
+    conn.commit()
+    conn.close()
+
+
+def set_user_language(tg_id: int, lang: str):
+    """Updates user language preference."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    now = datetime.now().isoformat()
+    cur.execute("UPDATE users SET language = ?, updated_at = ? WHERE tg_id = ?", (lang, now, tg_id))
+    conn.commit()
+    conn.close()
+
+
+def get_active_offers_count(tg_id: int) -> int:
+    """Returns count of active offers published by user."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT count(*) FROM offers WHERE tg_id = ? AND (status = 'active' OR status IS NULL)", (tg_id,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+
+def get_matches_left(tg_id: int):
+    """Returns number of remaining match searches for user."""
+    return get_matches_remaining(tg_id)
+
+
+def get_user_tier(tg_id: int) -> str:
+    """Returns subscription plan tier display string ('Free', 'Premium', 'Lifetime')."""
+    sub = get_subscription(tg_id)
+    if not sub:
+        return "Free"
+    plan = (sub.get('plan') or 'free').capitalize()
+    return plan
 

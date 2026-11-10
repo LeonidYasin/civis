@@ -55,6 +55,11 @@ def handle_survey(message: Message):
         return
     
     state, data = get_session(tg_id)
+
+    if state in ("settings_setkey", "settings_support"):
+        from .hubs import handle_settings_input
+        handle_settings_input(message, state, data)
+        return
     
     # --- SUPPORT MODE ---
     if state == 'support':
